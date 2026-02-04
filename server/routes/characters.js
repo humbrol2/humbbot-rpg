@@ -5,8 +5,15 @@
 import { v4 as uuid } from 'uuid';
 import { queryAll, queryOne, execute } from '../db/init.js';
 import { generateBackstory } from '../services/llm.js';
+import { getSettingConfig, getDefaultAttributes } from '../../shared/settings.js';
 
 export default async function characterRoutes(fastify) {
+
+  // Get setting config (for frontend to know what attributes to show)
+  fastify.get('/settings/:settingId', async (request, reply) => {
+    const config = getSettingConfig(request.params.settingId);
+    return config;
+  });
 
   // List characters (optionally by world)
   fastify.get('/', async (request, reply) => {
@@ -55,7 +62,7 @@ export default async function characterRoutes(fastify) {
       name,
       class: charClass,
       level = 1,
-      attributes = {},
+      attributes,
       skills = {},
       inventory = [],
       backstory,
@@ -66,11 +73,14 @@ export default async function characterRoutes(fastify) {
       return reply.status(400).send({ error: 'world_id and name are required' });
     }
 
-    // Verify world exists
-    const world = queryOne('SELECT id FROM worlds WHERE id = ?', [world_id]);
+    // Verify world exists and get its setting
+    const world = queryOne('SELECT id, setting FROM worlds WHERE id = ?', [world_id]);
     if (!world) {
       return reply.status(400).send({ error: 'World not found' });
     }
+
+    // Use setting-specific default attributes if none provided
+    const finalAttributes = attributes || getDefaultAttributes(world.setting);
 
     const id = uuid();
     const now = new Date().toISOString();
@@ -85,7 +95,7 @@ export default async function characterRoutes(fastify) {
         name,
         charClass || null,
         level,
-        JSON.stringify(attributes),
+        JSON.stringify(finalAttributes),
         JSON.stringify(skills),
         JSON.stringify(inventory),
         backstory || null,
@@ -95,7 +105,7 @@ export default async function characterRoutes(fastify) {
       ]
     );
 
-    return { id, world_id, name, class: charClass, level, attributes, skills };
+    return { id, world_id, name, class: charClass, level, attributes: finalAttributes, skills };
   });
 
   // Update character

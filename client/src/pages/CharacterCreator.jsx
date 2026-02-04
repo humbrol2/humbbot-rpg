@@ -1,16 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getWorlds } from '../api/worlds'
-import { createCharacter } from '../api/characters'
-
-const DEFAULT_ATTRIBUTES = {
-  STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10
-}
-
-const CLASSES = [
-  'Warrior', 'Mage', 'Rogue', 'Cleric', 'Ranger', 'Bard', 
-  'Paladin', 'Warlock', 'Monk', 'Barbarian', 'Custom'
-]
+import { createCharacter, getSettingConfig } from '../api/characters'
 
 function CharacterCreator() {
   const navigate = useNavigate()
@@ -18,6 +9,7 @@ function CharacterCreator() {
   const preselectedWorld = searchParams.get('world')
 
   const [worlds, setWorlds] = useState([])
+  const [settingConfig, setSettingConfig] = useState(null)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
 
@@ -26,7 +18,7 @@ function CharacterCreator() {
     name: '',
     class: '',
     level: 1,
-    attributes: { ...DEFAULT_ATTRIBUTES },
+    attributes: {},
     backstory: ''
   })
 
@@ -37,11 +29,20 @@ function CharacterCreator() {
   }, [])
 
   useEffect(() => {
-    // Point buy system: start with 8 in each, spend points to increase
-    const basePoints = 6 * 8 // 48 base
-    const currentPoints = Object.values(character.attributes).reduce((a, b) => a + b, 0)
-    setPointsRemaining(27 - (currentPoints - 60)) // 60 is 6 x 10 (default)
-  }, [character.attributes])
+    if (character.world_id) {
+      loadSettingConfig()
+    }
+  }, [character.world_id])
+
+  useEffect(() => {
+    if (settingConfig) {
+      // Calculate points remaining based on setting's attributes
+      const baseValue = 10
+      const totalBase = settingConfig.attributes.length * baseValue
+      const currentTotal = Object.values(character.attributes).reduce((a, b) => a + b, 0)
+      setPointsRemaining(27 - (currentTotal - totalBase))
+    }
+  }, [character.attributes, settingConfig])
 
   async function loadWorlds() {
     try {
@@ -54,6 +55,25 @@ function CharacterCreator() {
       console.error('Failed to load worlds:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadSettingConfig() {
+    const world = worlds.find(w => w.id === character.world_id)
+    if (!world) return
+
+    try {
+      const config = await getSettingConfig(world.setting)
+      setSettingConfig(config)
+      
+      // Initialize attributes for this setting
+      const newAttrs = {}
+      config.attributes.forEach(attr => {
+        newAttrs[attr] = 10
+      })
+      setCharacter(prev => ({ ...prev, attributes: newAttrs, class: '' }))
+    } catch (error) {
+      console.error('Failed to load setting config:', error)
     }
   }
 
@@ -75,6 +95,8 @@ function CharacterCreator() {
   }
 
   function rollAttributes() {
+    if (!settingConfig) return
+
     // 4d6 drop lowest for each
     const roll4d6 = () => {
       const rolls = [1,2,3,4].map(() => Math.floor(Math.random() * 6) + 1)
@@ -82,16 +104,14 @@ function CharacterCreator() {
       return rolls[0] + rolls[1] + rolls[2]
     }
 
+    const newAttrs = {}
+    settingConfig.attributes.forEach(attr => {
+      newAttrs[attr] = roll4d6()
+    })
+
     setCharacter(prev => ({
       ...prev,
-      attributes: {
-        STR: roll4d6(),
-        DEX: roll4d6(),
-        CON: roll4d6(),
-        INT: roll4d6(),
-        WIS: roll4d6(),
-        CHA: roll4d6()
-      }
+      attributes: newAttrs
     }))
   }
 
@@ -101,7 +121,7 @@ function CharacterCreator() {
 
     setCreating(true)
     try {
-      const created = await createCharacter(character)
+      await createCharacter(character)
       navigate(`/worlds/${character.world_id}`)
     } catch (error) {
       console.error('Failed to create character:', error)
@@ -127,6 +147,8 @@ function CharacterCreator() {
     )
   }
 
+  const selectedWorld = worlds.find(w => w.id === character.world_id)
+
   return (
     <div className="character-creator">
       <h1>👤 Create Character</h1>
@@ -150,6 +172,13 @@ function CharacterCreator() {
             </select>
           </div>
 
+          {settingConfig && (
+            <div className="setting-info">
+              <span className="setting-badge">{settingConfig.name}</span>
+              <small>{settingConfig.description}</small>
+            </div>
+          )}
+
           <div className="form-group">
             <label>Character Name</label>
             <input
@@ -168,15 +197,25 @@ function CharacterCreator() {
               onChange={e => setCharacter({ ...character, class: e.target.value })}
             >
               <option value="">Select class...</option>
-              {CLASSES.map(cls => (
+              {settingConfig?.classes.map(cls => (
                 <option key={cls} value={cls}>{cls}</option>
               ))}
             </select>
+            {settingConfig && (
+              <small className="setting-hint">
+                Classes available in {settingConfig.name} setting
+              </small>
+            )}
           </div>
         </div>
 
         <div className="form-section">
           <h2>Attributes</h2>
+          {settingConfig && (
+            <p className="setting-hint">
+              Attributes for {settingConfig.name}: {settingConfig.attributes.join(', ')}
+            </p>
+          )}
           <p className="points-display">
             Points remaining: <strong>{pointsRemaining}</strong>
             <button type="button" className="btn btn-small" onClick={rollAttributes}>
@@ -185,16 +224,22 @@ function CharacterCreator() {
           </p>
 
           <div className="attributes-grid">
-            {Object.entries(character.attributes).map(([attr, value]) => (
+            {settingConfig?.attributes.map(attr => (
               <div key={attr} className="attribute-row">
-                <span className="attr-name">{attr}</span>
+                <span className="attr-name" title={settingConfig.attributeNames[attr]}>
+                  {attr}
+                </span>
                 <div className="attr-controls">
                   <button type="button" onClick={() => adjustAttribute(attr, -1)}>-</button>
-                  <span className="attr-value">{value}</span>
+                  <span className="attr-value">{character.attributes[attr] || 10}</span>
                   <button type="button" onClick={() => adjustAttribute(attr, 1)}>+</button>
                 </div>
                 <span className="attr-modifier">
-                  ({value >= 10 ? '+' : ''}{Math.floor((value - 10) / 2)})
+                  ({(character.attributes[attr] || 10) >= 10 ? '+' : ''}
+                  {Math.floor(((character.attributes[attr] || 10) - 10) / 2)})
+                </span>
+                <span className="attr-fullname">
+                  {settingConfig.attributeNames[attr]}
                 </span>
               </div>
             ))}
@@ -207,7 +252,7 @@ function CharacterCreator() {
             <textarea
               value={character.backstory}
               onChange={e => setCharacter({ ...character, backstory: e.target.value })}
-              placeholder="Write your character's backstory... (optional)"
+              placeholder={`Write your character's backstory for the ${settingConfig?.name || ''} setting... (optional)`}
               rows={4}
             />
           </div>

@@ -1,5 +1,11 @@
 const API_BASE = '/api'
 
+export async function getSettingConfig(settingId) {
+  const response = await fetch(`${API_BASE}/characters/settings/${settingId}`)
+  if (!response.ok) throw new Error('Failed to fetch setting config')
+  return response.json()
+}
+
 export async function getCharacters(worldId = null) {
   const url = worldId 
     ? `${API_BASE}/characters?world_id=${worldId}`
