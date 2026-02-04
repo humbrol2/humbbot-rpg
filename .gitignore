@@ -1,0 +1,70 @@
+# Credentials - NEVER commit these
+.env
+.env.*
+*.env
+credentials.json
+secrets.json
+**/credentials/
+**/secrets/
+*.key
+*.pem
+*.p12
+api_keys.json
+config.local.json
+
+# LLM Model files (too large)
+*.gguf
+*.bin
+*.safetensors
+models/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+.venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+logs/
+*.log
+
+# Testing
+coverage/
+.nyc_output/
+
+# Database files (may contain user data)
+*.db
+*.sqlite
+*.sqlite3
+data/*.json
+
+# Session/state
+sessions/
+*.session
