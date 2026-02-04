@@ -1,12 +1,12 @@
 /**
  * Database initialization
- * Uses SQLite for persistence
+ * Uses sql.js (pure JS SQLite) for persistence
  */
 
-import Database from 'better-sqlite3';
+import initSqlJs from 'sql.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -14,6 +14,7 @@ const __dirname = dirname(__filename);
 const DB_PATH = process.env.DB_PATH || join(__dirname, '../../data/rpg.db');
 
 let db = null;
+let SQL = null;
 
 export function getDb() {
   if (!db) {
@@ -22,18 +23,43 @@ export function getDb() {
   return db;
 }
 
+// Save database to file
+export function saveDatabase() {
+  if (!db) return;
+  const data = db.export();
+  const buffer = Buffer.from(data);
+  writeFileSync(DB_PATH, buffer);
+}
+
+// Auto-save wrapper for write operations
+export function runWithSave(sql, params = []) {
+  const result = db.run(sql, params);
+  saveDatabase();
+  return result;
+}
+
 export async function initDatabase() {
+  // Initialize SQL.js
+  SQL = await initSqlJs();
+
   // Ensure data directory exists
   const dataDir = dirname(DB_PATH);
   if (!existsSync(dataDir)) {
     mkdirSync(dataDir, { recursive: true });
   }
 
-  db = new Database(DB_PATH);
-  db.pragma('journal_mode = WAL');
+  // Load existing database or create new one
+  if (existsSync(DB_PATH)) {
+    const fileBuffer = readFileSync(DB_PATH);
+    db = new SQL.Database(fileBuffer);
+    console.log('📚 Database loaded from', DB_PATH);
+  } else {
+    db = new SQL.Database();
+    console.log('📚 Creating new database at', DB_PATH);
+  }
 
   // Create tables
-  db.exec(`
+  db.run(`
     -- Worlds table
     CREATE TABLE IF NOT EXISTS worlds (
       id TEXT PRIMARY KEY,
@@ -43,8 +69,10 @@ export async function initDatabase() {
       config TEXT DEFAULT '{}',
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
+    )
+  `);
 
+  db.run(`
     -- Characters table
     CREATE TABLE IF NOT EXISTS characters (
       id TEXT PRIMARY KEY,
@@ -62,8 +90,10 @@ export async function initDatabase() {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (world_id) REFERENCES worlds(id) ON DELETE CASCADE
-    );
+    )
+  `);
 
+  db.run(`
     -- Sessions table (game sessions)
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
@@ -74,8 +104,10 @@ export async function initDatabase() {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (world_id) REFERENCES worlds(id) ON DELETE CASCADE
-    );
+    )
+  `);
 
+  db.run(`
     -- Session history (messages/events)
     CREATE TABLE IF NOT EXISTS session_history (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,8 +117,10 @@ export async function initDatabase() {
       metadata TEXT DEFAULT '{}',
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
-    );
+    )
+  `);
 
+  db.run(`
     -- Session participants
     CREATE TABLE IF NOT EXISTS session_participants (
       session_id TEXT NOT NULL,
@@ -95,8 +129,10 @@ export async function initDatabase() {
       PRIMARY KEY (session_id, character_id),
       FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
       FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
-    );
+    )
+  `);
 
+  db.run(`
     -- World templates (pre-built settings)
     CREATE TABLE IF NOT EXISTS templates (
       id TEXT PRIMARY KEY,
@@ -106,16 +142,44 @@ export async function initDatabase() {
       config TEXT NOT NULL,
       is_builtin INTEGER DEFAULT 0,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
-
-    -- Create indexes
-    CREATE INDEX IF NOT EXISTS idx_characters_world ON characters(world_id);
-    CREATE INDEX IF NOT EXISTS idx_sessions_world ON sessions(world_id);
-    CREATE INDEX IF NOT EXISTS idx_history_session ON session_history(session_id);
+    )
   `);
 
-  console.log('📚 Database initialized at', DB_PATH);
+  // Create indexes
+  db.run(`CREATE INDEX IF NOT EXISTS idx_characters_world ON characters(world_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_sessions_world ON sessions(world_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_history_session ON session_history(session_id)`);
+
+  // Save initial schema
+  saveDatabase();
+
   return db;
 }
 
-export default { initDatabase, getDb };
+// Helper to convert sql.js results to array of objects
+export function queryAll(sql, params = []) {
+  const stmt = db.prepare(sql);
+  if (params.length) stmt.bind(params);
+  
+  const results = [];
+  while (stmt.step()) {
+    results.push(stmt.getAsObject());
+  }
+  stmt.free();
+  return results;
+}
+
+// Helper for single row queries
+export function queryOne(sql, params = []) {
+  const results = queryAll(sql, params);
+  return results[0] || null;
+}
+
+// Helper for insert/update/delete with auto-save
+export function execute(sql, params = []) {
+  db.run(sql, params);
+  saveDatabase();
+  return { changes: db.getRowsModified() };
+}
+
+export default { initDatabase, getDb, saveDatabase, queryAll, queryOne, execute };

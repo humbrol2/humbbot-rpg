@@ -3,27 +3,26 @@
  */
 
 import { v4 as uuid } from 'uuid';
-import { getDb } from '../db/init.js';
+import { queryAll, queryOne, execute } from '../db/init.js';
 import { generateBackstory } from '../services/llm.js';
 
 export default async function characterRoutes(fastify) {
 
   // List characters (optionally by world)
   fastify.get('/', async (request, reply) => {
-    const db = getDb();
     const { world_id } = request.query;
 
-    let query = 'SELECT * FROM characters';
+    let sql = 'SELECT * FROM characters';
     const params = [];
 
     if (world_id) {
-      query += ' WHERE world_id = ?';
+      sql += ' WHERE world_id = ?';
       params.push(world_id);
     }
 
-    query += ' ORDER BY updated_at DESC';
+    sql += ' ORDER BY updated_at DESC';
 
-    const characters = db.prepare(query).all(...params);
+    const characters = queryAll(sql, params);
     return characters.map(c => ({
       ...c,
       attributes: JSON.parse(c.attributes || '{}'),
@@ -34,8 +33,7 @@ export default async function characterRoutes(fastify) {
 
   // Get single character
   fastify.get('/:id', async (request, reply) => {
-    const db = getDb();
-    const character = db.prepare('SELECT * FROM characters WHERE id = ?').get(request.params.id);
+    const character = queryOne('SELECT * FROM characters WHERE id = ?', [request.params.id]);
 
     if (!character) {
       return reply.status(404).send({ error: 'Character not found' });
@@ -51,7 +49,6 @@ export default async function characterRoutes(fastify) {
 
   // Create character
   fastify.post('/', async (request, reply) => {
-    const db = getDb();
     const {
       world_id,
       player_id,
@@ -70,29 +67,32 @@ export default async function characterRoutes(fastify) {
     }
 
     // Verify world exists
-    const world = db.prepare('SELECT id FROM worlds WHERE id = ?').get(world_id);
+    const world = queryOne('SELECT id FROM worlds WHERE id = ?', [world_id]);
     if (!world) {
       return reply.status(400).send({ error: 'World not found' });
     }
 
     const id = uuid();
-    const stmt = db.prepare(`
-      INSERT INTO characters (id, world_id, player_id, name, class, level, attributes, skills, inventory, backstory, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+    const now = new Date().toISOString();
 
-    stmt.run(
-      id,
-      world_id,
-      player_id || null,
-      name,
-      charClass || null,
-      level,
-      JSON.stringify(attributes),
-      JSON.stringify(skills),
-      JSON.stringify(inventory),
-      backstory || null,
-      notes || null
+    execute(
+      `INSERT INTO characters (id, world_id, player_id, name, class, level, attributes, skills, inventory, backstory, notes, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        world_id,
+        player_id || null,
+        name,
+        charClass || null,
+        level,
+        JSON.stringify(attributes),
+        JSON.stringify(skills),
+        JSON.stringify(inventory),
+        backstory || null,
+        notes || null,
+        now,
+        now
+      ]
     );
 
     return { id, world_id, name, class: charClass, level, attributes, skills };
@@ -100,9 +100,15 @@ export default async function characterRoutes(fastify) {
 
   // Update character
   fastify.put('/:id', async (request, reply) => {
-    const db = getDb();
     const updates = request.body;
     const id = request.params.id;
+    const now = new Date().toISOString();
+
+    // Check exists
+    const existing = queryOne('SELECT id FROM characters WHERE id = ?', [id]);
+    if (!existing) {
+      return reply.status(404).send({ error: 'Character not found' });
+    }
 
     // Build dynamic update
     const fields = [];
@@ -122,23 +128,18 @@ export default async function characterRoutes(fastify) {
       return reply.status(400).send({ error: 'No valid fields to update' });
     }
 
-    fields.push('updated_at = CURRENT_TIMESTAMP');
+    fields.push('updated_at = ?');
+    values.push(now);
     values.push(id);
 
-    const stmt = db.prepare(`UPDATE characters SET ${fields.join(', ')} WHERE id = ?`);
-    const result = stmt.run(...values);
-
-    if (result.changes === 0) {
-      return reply.status(404).send({ error: 'Character not found' });
-    }
+    execute(`UPDATE characters SET ${fields.join(', ')} WHERE id = ?`, values);
 
     return { success: true };
   });
 
   // Delete character
   fastify.delete('/:id', async (request, reply) => {
-    const db = getDb();
-    const result = db.prepare('DELETE FROM characters WHERE id = ?').run(request.params.id);
+    const result = execute('DELETE FROM characters WHERE id = ?', [request.params.id]);
 
     if (result.changes === 0) {
       return reply.status(404).send({ error: 'Character not found' });
@@ -149,14 +150,13 @@ export default async function characterRoutes(fastify) {
 
   // Generate backstory suggestions
   fastify.post('/:id/backstory/generate', async (request, reply) => {
-    const db = getDb();
-    const character = db.prepare('SELECT * FROM characters WHERE id = ?').get(request.params.id);
+    const character = queryOne('SELECT * FROM characters WHERE id = ?', [request.params.id]);
 
     if (!character) {
       return reply.status(404).send({ error: 'Character not found' });
     }
 
-    const world = db.prepare('SELECT * FROM worlds WHERE id = ?').get(character.world_id);
+    const world = queryOne('SELECT * FROM worlds WHERE id = ?', [character.world_id]);
     const concept = request.body.concept || `${character.name}, a ${character.class}`;
 
     try {

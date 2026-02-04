@@ -4,6 +4,7 @@ import websocket from '@fastify/websocket';
 import fastifyStatic from '@fastify/static';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { existsSync } from 'fs';
 
 import worldRoutes from './routes/worlds.js';
 import characterRoutes from './routes/characters.js';
@@ -39,10 +40,13 @@ async function start() {
     await fastify.register(websocket);
 
     // Serve static files (for production)
-    await fastify.register(fastifyStatic, {
-      root: join(__dirname, '../client/dist'),
-      prefix: '/'
-    });
+    const staticPath = join(__dirname, '../client/dist');
+    if (existsSync(staticPath)) {
+      await fastify.register(fastifyStatic, {
+        root: staticPath,
+        prefix: '/'
+      });
+    }
 
     // Register routes
     await fastify.register(worldRoutes, { prefix: '/api/worlds' });

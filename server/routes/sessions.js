@@ -3,27 +3,26 @@
  */
 
 import { v4 as uuid } from 'uuid';
-import { getDb } from '../db/init.js';
+import { queryAll, queryOne, execute } from '../db/init.js';
 import { generateGMResponse } from '../services/llm.js';
 
 export default async function sessionRoutes(fastify) {
 
   // List sessions (optionally by world)
   fastify.get('/', async (request, reply) => {
-    const db = getDb();
     const { world_id } = request.query;
 
-    let query = 'SELECT * FROM sessions';
+    let sql = 'SELECT * FROM sessions';
     const params = [];
 
     if (world_id) {
-      query += ' WHERE world_id = ?';
+      sql += ' WHERE world_id = ?';
       params.push(world_id);
     }
 
-    query += ' ORDER BY updated_at DESC';
+    sql += ' ORDER BY updated_at DESC';
 
-    const sessions = db.prepare(query).all(...params);
+    const sessions = queryAll(sql, params);
     return sessions.map(s => ({
       ...s,
       state: JSON.parse(s.state || '{}')
@@ -32,27 +31,28 @@ export default async function sessionRoutes(fastify) {
 
   // Get single session with history
   fastify.get('/:id', async (request, reply) => {
-    const db = getDb();
-    const session = db.prepare('SELECT * FROM sessions WHERE id = ?').get(request.params.id);
+    const session = queryOne('SELECT * FROM sessions WHERE id = ?', [request.params.id]);
 
     if (!session) {
       return reply.status(404).send({ error: 'Session not found' });
     }
 
     // Get history
-    const history = db.prepare(`
-      SELECT role, content, metadata, created_at 
-      FROM session_history 
-      WHERE session_id = ? 
-      ORDER BY created_at ASC
-    `).all(request.params.id);
+    const history = queryAll(
+      `SELECT role, content, metadata, created_at 
+       FROM session_history 
+       WHERE session_id = ? 
+       ORDER BY created_at ASC`,
+      [request.params.id]
+    );
 
     // Get participants
-    const participants = db.prepare(`
-      SELECT c.* FROM characters c
-      JOIN session_participants sp ON c.id = sp.character_id
-      WHERE sp.session_id = ?
-    `).all(request.params.id);
+    const participants = queryAll(
+      `SELECT c.* FROM characters c
+       JOIN session_participants sp ON c.id = sp.character_id
+       WHERE sp.session_id = ?`,
+      [request.params.id]
+    );
 
     return {
       ...session,
@@ -71,7 +71,6 @@ export default async function sessionRoutes(fastify) {
 
   // Create session
   fastify.post('/', async (request, reply) => {
-    const db = getDb();
     const { world_id, name, character_ids = [] } = request.body;
 
     if (!world_id) {
@@ -79,29 +78,28 @@ export default async function sessionRoutes(fastify) {
     }
 
     // Verify world exists
-    const world = db.prepare('SELECT * FROM worlds WHERE id = ?').get(world_id);
+    const world = queryOne('SELECT * FROM worlds WHERE id = ?', [world_id]);
     if (!world) {
       return reply.status(400).send({ error: 'World not found' });
     }
 
     const id = uuid();
     const sessionName = name || `Session ${new Date().toLocaleDateString()}`;
+    const now = new Date().toISOString();
 
-    db.prepare(`
-      INSERT INTO sessions (id, world_id, name, current_scene)
-      VALUES (?, ?, ?, ?)
-    `).run(id, world_id, sessionName, 'The adventure begins...');
+    execute(
+      `INSERT INTO sessions (id, world_id, name, current_scene, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, world_id, sessionName, 'The adventure begins...', now, now]
+    );
 
     // Add participants
-    if (character_ids.length > 0) {
-      const addParticipant = db.prepare(`
-        INSERT INTO session_participants (session_id, character_id)
-        VALUES (?, ?)
-      `);
-
-      for (const charId of character_ids) {
-        addParticipant.run(id, charId);
-      }
+    for (const charId of character_ids) {
+      execute(
+        `INSERT INTO session_participants (session_id, character_id, joined_at)
+         VALUES (?, ?, ?)`,
+        [id, charId, now]
+      );
     }
 
     return { id, world_id, name: sessionName };
@@ -109,7 +107,6 @@ export default async function sessionRoutes(fastify) {
 
   // Add character to session
   fastify.post('/:id/characters', async (request, reply) => {
-    const db = getDb();
     const { character_id } = request.body;
 
     if (!character_id) {
@@ -117,10 +114,12 @@ export default async function sessionRoutes(fastify) {
     }
 
     try {
-      db.prepare(`
-        INSERT INTO session_participants (session_id, character_id)
-        VALUES (?, ?)
-      `).run(request.params.id, character_id);
+      const now = new Date().toISOString();
+      execute(
+        `INSERT INTO session_participants (session_id, character_id, joined_at)
+         VALUES (?, ?, ?)`,
+        [request.params.id, character_id, now]
+      );
 
       return { success: true };
     } catch (error) {
@@ -130,7 +129,6 @@ export default async function sessionRoutes(fastify) {
 
   // Send action (play the game!)
   fastify.post('/:id/action', async (request, reply) => {
-    const db = getDb();
     const { character_id, action } = request.body;
 
     if (!action) {
@@ -138,27 +136,29 @@ export default async function sessionRoutes(fastify) {
     }
 
     // Get session with world
-    const session = db.prepare('SELECT * FROM sessions WHERE id = ?').get(request.params.id);
+    const session = queryOne('SELECT * FROM sessions WHERE id = ?', [request.params.id]);
     if (!session) {
       return reply.status(404).send({ error: 'Session not found' });
     }
 
-    const world = db.prepare('SELECT * FROM worlds WHERE id = ?').get(session.world_id);
+    const world = queryOne('SELECT * FROM worlds WHERE id = ?', [session.world_id]);
 
     // Get recent history
-    const recentHistory = db.prepare(`
-      SELECT role, content FROM session_history 
-      WHERE session_id = ? 
-      ORDER BY created_at DESC 
-      LIMIT 10
-    `).all(request.params.id).reverse();
+    const recentHistory = queryAll(
+      `SELECT role, content FROM session_history 
+       WHERE session_id = ? 
+       ORDER BY created_at DESC 
+       LIMIT 10`,
+      [request.params.id]
+    ).reverse();
 
     // Get characters
-    const characters = db.prepare(`
-      SELECT c.* FROM characters c
-      JOIN session_participants sp ON c.id = sp.character_id
-      WHERE sp.session_id = ?
-    `).all(request.params.id);
+    const characters = queryAll(
+      `SELECT c.* FROM characters c
+       JOIN session_participants sp ON c.id = sp.character_id
+       WHERE sp.session_id = ?`,
+      [request.params.id]
+    );
 
     // Build session context
     const sessionContext = {
@@ -191,22 +191,28 @@ export default async function sessionRoutes(fastify) {
       const gmResponse = await generateGMResponse(worldContext, sessionContext, playerAction);
 
       // Save to history
-      const insertHistory = db.prepare(`
-        INSERT INTO session_history (session_id, role, content)
-        VALUES (?, ?, ?)
-      `);
-
-      insertHistory.run(request.params.id, 'user', playerAction);
-      insertHistory.run(request.params.id, 'assistant', gmResponse);
+      const now = new Date().toISOString();
+      execute(
+        `INSERT INTO session_history (session_id, role, content, created_at)
+         VALUES (?, ?, ?, ?)`,
+        [request.params.id, 'user', playerAction, now]
+      );
+      execute(
+        `INSERT INTO session_history (session_id, role, content, created_at)
+         VALUES (?, ?, ?, ?)`,
+        [request.params.id, 'assistant', gmResponse, now]
+      );
 
       // Update session timestamp
-      db.prepare('UPDATE sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-        .run(request.params.id);
+      execute(
+        'UPDATE sessions SET updated_at = ? WHERE id = ?',
+        [now, request.params.id]
+      );
 
       return {
         action: playerAction,
         response: gmResponse,
-        timestamp: new Date().toISOString()
+        timestamp: now
       };
 
     } catch (error) {
@@ -219,8 +225,7 @@ export default async function sessionRoutes(fastify) {
 
   // Delete session
   fastify.delete('/:id', async (request, reply) => {
-    const db = getDb();
-    const result = db.prepare('DELETE FROM sessions WHERE id = ?').run(request.params.id);
+    const result = execute('DELETE FROM sessions WHERE id = ?', [request.params.id]);
 
     if (result.changes === 0) {
       return reply.status(404).send({ error: 'Session not found' });

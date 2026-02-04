@@ -3,7 +3,7 @@
  */
 
 import { checkHealth, generateWorldContent } from '../services/llm.js';
-import { getDb } from '../db/init.js';
+import { queryOne } from '../db/init.js';
 
 export default async function llmRoutes(fastify) {
 
@@ -29,8 +29,7 @@ export default async function llmRoutes(fastify) {
       return reply.status(400).send({ error: 'world_id and prompt are required' });
     }
 
-    const db = getDb();
-    const world = db.prepare('SELECT * FROM worlds WHERE id = ?').get(world_id);
+    const world = queryOne('SELECT * FROM worlds WHERE id = ?', [world_id]);
 
     if (!world) {
       return reply.status(404).send({ error: 'World not found' });

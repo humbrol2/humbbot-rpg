@@ -3,14 +3,13 @@
  */
 
 import { v4 as uuid } from 'uuid';
-import { getDb } from '../db/init.js';
+import { queryAll, queryOne, execute } from '../db/init.js';
 
 export default async function worldRoutes(fastify) {
   
   // List all worlds
   fastify.get('/', async (request, reply) => {
-    const db = getDb();
-    const worlds = db.prepare('SELECT * FROM worlds ORDER BY updated_at DESC').all();
+    const worlds = queryAll('SELECT * FROM worlds ORDER BY updated_at DESC');
     return worlds.map(w => ({
       ...w,
       config: JSON.parse(w.config || '{}')
@@ -19,8 +18,7 @@ export default async function worldRoutes(fastify) {
 
   // Get single world
   fastify.get('/:id', async (request, reply) => {
-    const db = getDb();
-    const world = db.prepare('SELECT * FROM worlds WHERE id = ?').get(request.params.id);
+    const world = queryOne('SELECT * FROM worlds WHERE id = ?', [request.params.id]);
     if (!world) {
       return reply.status(404).send({ error: 'World not found' });
     }
@@ -32,7 +30,6 @@ export default async function worldRoutes(fastify) {
 
   // Create world
   fastify.post('/', async (request, reply) => {
-    const db = getDb();
     const { name, setting, description, config = {} } = request.body;
 
     if (!name || !setting) {
@@ -40,50 +37,49 @@ export default async function worldRoutes(fastify) {
     }
 
     const id = uuid();
-    const stmt = db.prepare(`
-      INSERT INTO worlds (id, name, setting, description, config)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-
-    stmt.run(id, name, setting, description || '', JSON.stringify(config));
+    const now = new Date().toISOString();
+    
+    execute(
+      `INSERT INTO worlds (id, name, setting, description, config, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, name, setting, description || '', JSON.stringify(config), now, now]
+    );
 
     return { id, name, setting, description, config };
   });
 
   // Update world
   fastify.put('/:id', async (request, reply) => {
-    const db = getDb();
     const { name, setting, description, config } = request.body;
+    const now = new Date().toISOString();
 
-    const stmt = db.prepare(`
-      UPDATE worlds 
-      SET name = COALESCE(?, name),
-          setting = COALESCE(?, setting),
-          description = COALESCE(?, description),
-          config = COALESCE(?, config),
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `);
-
-    const result = stmt.run(
-      name || null,
-      setting || null,
-      description || null,
-      config ? JSON.stringify(config) : null,
-      request.params.id
-    );
-
-    if (result.changes === 0) {
+    // Check if world exists
+    const existing = queryOne('SELECT id FROM worlds WHERE id = ?', [request.params.id]);
+    if (!existing) {
       return reply.status(404).send({ error: 'World not found' });
     }
+
+    // Build update dynamically
+    const updates = [];
+    const params = [];
+
+    if (name !== undefined) { updates.push('name = ?'); params.push(name); }
+    if (setting !== undefined) { updates.push('setting = ?'); params.push(setting); }
+    if (description !== undefined) { updates.push('description = ?'); params.push(description); }
+    if (config !== undefined) { updates.push('config = ?'); params.push(JSON.stringify(config)); }
+    
+    updates.push('updated_at = ?');
+    params.push(now);
+    params.push(request.params.id);
+
+    execute(`UPDATE worlds SET ${updates.join(', ')} WHERE id = ?`, params);
 
     return { success: true };
   });
 
   // Delete world
   fastify.delete('/:id', async (request, reply) => {
-    const db = getDb();
-    const result = db.prepare('DELETE FROM worlds WHERE id = ?').run(request.params.id);
+    const result = execute('DELETE FROM worlds WHERE id = ?', [request.params.id]);
 
     if (result.changes === 0) {
       return reply.status(404).send({ error: 'World not found' });
