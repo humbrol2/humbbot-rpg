@@ -9,6 +9,7 @@ import { existsSync } from 'fs';
 import worldRoutes from './routes/worlds.js';
 import characterRoutes from './routes/characters.js';
 import sessionRoutes from './routes/sessions.js';
+import enhancedSessionRoutes from './routes/enhanced-sessions.js';
 import llmRoutes from './routes/llm.js';
 import { initDatabase } from './db/init.js';
 
@@ -52,6 +53,7 @@ async function start() {
     await fastify.register(worldRoutes, { prefix: '/api/worlds' });
     await fastify.register(characterRoutes, { prefix: '/api/characters' });
     await fastify.register(sessionRoutes, { prefix: '/api/sessions' });
+    await fastify.register(enhancedSessionRoutes, { prefix: '/api/sessions' });
     await fastify.register(llmRoutes, { prefix: '/api/llm' });
 
     // Health check
