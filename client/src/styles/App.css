@@ -842,9 +842,10 @@
 
 /* Chat Window Height Management */
 .game-chat-container {
-  max-height: calc(100vh - 200px);
+  max-height: calc(100vh - 300px);
   min-height: 400px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* Prevent page from growing with long messages */
@@ -856,7 +857,33 @@
 .chat-messages-wrapper {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Force scrollbar visibility */
+.messages-container::-webkit-scrollbar {
+  width: 16px !important;
+  background: var(--bg-secondary);
+}
+
+.messages-container::-webkit-scrollbar-thumb {
+  background: var(--accent) !important;
+  border-radius: 8px;
+  border: 3px solid var(--bg-secondary);
+}
+
+/* Job board formatting */
+.job-board-container {
+  line-height: 1.6;
+}
+
+.job-board-container strong {
+  display: block;
+  margin-bottom: 4px;
+  margin-top: 12px;
+  font-size: 1.1em;
 }
 
 /* Responsive */

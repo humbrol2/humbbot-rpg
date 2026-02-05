@@ -291,7 +291,7 @@ const EnhancedGameSession = () => {
 
         {/* Center - Message History */}
         <div className="flex-1 flex flex-col min-w-0 chat-messages-wrapper">
-          <div className="flex-1 game-chat-container message-history-scroll messages-container p-4">
+          <div className="flex-1 game-chat-container message-history-scroll messages-container p-4" style={{maxHeight: 'calc(100vh - 300px)'}}>
             <MessageHistory
               messages={messages}
               world={world}

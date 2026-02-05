@@ -330,12 +330,11 @@ function buildResponseStyleInstructions(requestType) {
 - Include only what's asked for`,
     
     jobs: `RESPONSE TYPE: JOB/WORK LISTING
-- List available jobs/work/tasks with clear line breaks between each job
-- Format: Job Title | Pay: X credits/hour | Requirements: Y | Brief description
-- Use double line breaks (\\n\\n) between each job entry
-- Start each job with "**Job Title**" in bold
-- NO run-on sentences or walls of text
-- Maximum 3-4 jobs total for readability`,
+- List EXACTLY 4 jobs maximum
+- Format each job as: **Job Title** \\n• Pay: X credits/hour \\n• Requirements: Y \\n• Description: Brief one-line description \\n\\n
+- Use double line breaks between jobs
+- Keep each job description to ONE sentence only
+- NO narrative text, just job listings`,
     
     look: `RESPONSE TYPE: ENVIRONMENT DESCRIPTION
 - Describe the immediate surroundings

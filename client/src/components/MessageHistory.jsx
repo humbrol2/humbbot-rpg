@@ -77,7 +77,7 @@ const MessageHistory = ({ messages, world, isProcessing }) => {
   }
 
   const formatMessageContent = (content) => {
-    // Convert line breaks to HTML breaks
+    // First, preserve line breaks by converting to HTML
     content = content.replace(/\n\n/g, '<br><br>')
     content = content.replace(/\n/g, '<br>')
     
@@ -85,15 +85,15 @@ const MessageHistory = ({ messages, world, isProcessing }) => {
     content = content.replace(/\[ROLL:(\w+):(\w+)\]/g, 
       '<span class="inline-flex items-center gap-1 px-2 py-1 bg-primary-500 bg-opacity-20 rounded text-primary-400 font-mono text-sm">🎲 $1 ($2)</span>')
     
-    // Format emphasis
-    content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    // Format emphasis (bold/italic)
+    content = content.replace(/\*\*(.*?)\*\*/g, '<strong class="text-primary-200 font-bold">$1</strong>')
     content = content.replace(/\*(.*?)\*/g, '<em>$1</em>')
     
     // Format dialogue
     content = content.replace(/"([^"]+)"/g, '<span class="text-primary-300">"$1"</span>')
     
-    // Format bullet points
-    content = content.replace(/^• (.+)$/gm, '<div class="ml-4 mb-1">• $1</div>')
+    // Format bullet points with better spacing
+    content = content.replace(/(^|\<br\>)• (.+?)(?=\<br\>|$)/g, '$1<div class="ml-4 mb-2 flex items-start"><span class="text-accent mr-2">•</span><span>$2</span></div>')
     
     return content
   }
@@ -215,7 +215,9 @@ const MessageHistory = ({ messages, world, isProcessing }) => {
               {/* Message Content */}
               <div className="prose prose-invert max-w-none">
                 <div
-                  className="text-sm leading-relaxed"
+                  className={`text-sm leading-relaxed ${
+                    message.content.includes('JOB BOARD') ? 'job-board-container' : ''
+                  }`}
                   dangerouslySetInnerHTML={{
                     __html: formatMessageContent(message.content)
                   }}
