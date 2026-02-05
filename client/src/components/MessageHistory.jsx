@@ -136,7 +136,7 @@ const MessageHistory = ({ messages, world, isProcessing }) => {
       <div
         ref={messagesContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto space-y-4"
+        className="flex-1 message-history-scroll messages-container space-y-4"
       >
         {/* Session Introduction */}
         {filteredMessages.length === 0 && filter === 'all' && !searchTerm && (

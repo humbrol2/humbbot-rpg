@@ -53,7 +53,7 @@ async function start() {
     await fastify.register(worldRoutes, { prefix: '/api/worlds' });
     await fastify.register(characterRoutes, { prefix: '/api/characters' });
     await fastify.register(sessionRoutes, { prefix: '/api/sessions' });
-    await fastify.register(enhancedSessionRoutes, { prefix: '/api/sessions' });
+    await fastify.register(enhancedSessionRoutes, { prefix: '/api/enhanced-sessions' });
     await fastify.register(llmRoutes, { prefix: '/api/llm' });
 
     // Health check

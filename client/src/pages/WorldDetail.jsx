@@ -12,6 +12,8 @@ function WorldDetail() {
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('characters')
+  const [showCharacterSelect, setShowCharacterSelect] = useState(false)
+  const [selectedCharacter, setSelectedCharacter] = useState(null)
 
   useEffect(() => {
     loadWorldData()
@@ -34,9 +36,19 @@ function WorldDetail() {
     }
   }
 
-  async function handleStartSession() {
+  function handleStartSession() {
     if (characters.length === 0) {
       alert('Create at least one character first!')
+      return
+    }
+
+    // Show character selection modal
+    setShowCharacterSelect(true)
+  }
+
+  async function handleStartWithCharacter() {
+    if (!selectedCharacter) {
+      alert('Please select a character!')
       return
     }
 
@@ -44,13 +56,18 @@ function WorldDetail() {
       const session = await createSession({
         world_id: id,
         name: `Adventure ${new Date().toLocaleDateString()}`,
-        character_ids: characters.map(c => c.id)
+        character_ids: [selectedCharacter.id]
       })
       navigate(`/session/${session.id}`)
     } catch (error) {
       console.error('Failed to start session:', error)
       alert('Failed to start session')
     }
+  }
+
+  function handleCancelCharacterSelect() {
+    setShowCharacterSelect(false)
+    setSelectedCharacter(null)
   }
 
   async function handleQuickCharacter() {
@@ -89,7 +106,7 @@ function WorldDetail() {
           <span className="world-setting-badge large">{world.setting}</span>
         </div>
         <button className="btn btn-primary btn-large" onClick={handleStartSession}>
-          ▶️ Start Session
+          🎮 Start New Adventure
         </button>
       </header>
 
@@ -132,7 +149,10 @@ function WorldDetail() {
 
             {characters.length === 0 ? (
               <div className="empty-state small">
-                <p>No characters yet. Create one to start playing!</p>
+                <p>🎭 No characters yet. Create one to start your adventure!</p>
+                <Link to="/characters/new" className="btn btn-primary">
+                  Create Your First Character
+                </Link>
               </div>
             ) : (
               <div className="characters-grid">
@@ -168,10 +188,17 @@ function WorldDetail() {
                   <div key={session.id} className="session-item">
                     <div>
                       <h4>{session.name}</h4>
-                      <small>Last played: {new Date(session.updated_at).toLocaleString()}</small>
+                      <small>
+                        Last played: {new Date(session.updated_at).toLocaleString()}
+                        {session.characters?.length > 0 && (
+                          <span className="session-character">
+                            • Playing as: {session.characters.map(c => c.name).join(', ')}
+                          </span>
+                        )}
+                      </small>
                     </div>
                     <Link to={`/session/${session.id}`} className="btn btn-secondary">
-                      Continue
+                      Continue Adventure
                     </Link>
                   </div>
                 ))}
@@ -190,6 +217,61 @@ function WorldDetail() {
           </div>
         )}
       </section>
+
+      {/* Character Selection Modal */}
+      {showCharacterSelect && (
+        <div className="modal-overlay" onClick={handleCancelCharacterSelect}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Choose Your Character</h2>
+              <button className="close-btn" onClick={handleCancelCharacterSelect}>×</button>
+            </div>
+            
+            <div className="modal-body">
+              <p>Select which character you want to play as in this session:</p>
+              
+              <div className="character-selection">
+                {characters.map(char => (
+                  <div 
+                    key={char.id} 
+                    className={`character-option ${selectedCharacter?.id === char.id ? 'selected' : ''}`}
+                    onClick={() => setSelectedCharacter(char)}
+                  >
+                    <div className="character-avatar">
+                      <span className="character-initial">{char.name[0].toUpperCase()}</span>
+                    </div>
+                    <div className="character-details">
+                      <h4>{char.name}</h4>
+                      <p className="character-class">{char.class} • Level {char.level}</p>
+                      <div className="character-stats">
+                        {Object.entries(char.attributes || {}).slice(0, 3).map(([key, val]) => (
+                          <span key={key} className="stat">{key} {val}</span>
+                        ))}
+                      </div>
+                    </div>
+                    {selectedCharacter?.id === char.id && (
+                      <div className="selection-indicator">✓</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={handleCancelCharacterSelect}>
+                Cancel
+              </button>
+              <button 
+                className="btn btn-primary" 
+                onClick={handleStartWithCharacter}
+                disabled={!selectedCharacter}
+              >
+                Start Adventure
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

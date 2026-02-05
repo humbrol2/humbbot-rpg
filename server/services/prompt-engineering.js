@@ -328,7 +328,8 @@ export class AdvancedPromptBuilder {
       sceneType = 'story',
       importance = 0.5,
       contextBudget = 4000,
-      includeMemory = true
+      includeMemory = true,
+      responseStyle = null
     } = options;
 
     const sections = [];
@@ -360,6 +361,11 @@ export class AdvancedPromptBuilder {
 
     // Game mechanics reminder
     sections.push(this.buildMechanicsSection());
+
+    // Response style override for specific request types
+    if (responseStyle) {
+      sections.push(this.buildResponseStyleSection(responseStyle));
+    }
 
     return sections.join('\n\n');
   }
@@ -466,6 +472,24 @@ Your core responsibilities:
 - Always end with situation requiring player decision or action
 - NEVER directly control player characters
 - Track and mention relationship changes when relevant`;
+  }
+
+  buildResponseStyleSection(responseStyle) {
+    const styleMap = {
+      inventory: 'Focus on listing items concisely with minimal narrative',
+      stats: 'Provide clear character status with no extra description',
+      look: 'Describe environment systematically with useful details',
+      combat: 'Emphasize action resolution and tactical outcomes',
+      dialogue: 'Focus on NPC responses and social dynamics',
+      investigation: 'Present discoveries clearly with actionable details'
+    };
+
+    const instruction = styleMap[responseStyle] || 'Standard narrative response';
+    
+    return `## Response Style Override
+**Request Type:** ${responseStyle}
+**Focus:** ${instruction}
+**Brevity:** ${['inventory', 'stats'].includes(responseStyle) ? 'Very concise' : 'Balanced'}`;
   }
 }
 

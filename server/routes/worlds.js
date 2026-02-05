@@ -45,7 +45,7 @@ export default async function worldRoutes(fastify) {
       [id, name, setting, description || '', JSON.stringify(config), now, now]
     );
 
-    return { id, name, setting, description, config };
+    return { id, name, setting, description, config, created_at: now, updated_at: now };
   });
 
   // Update world

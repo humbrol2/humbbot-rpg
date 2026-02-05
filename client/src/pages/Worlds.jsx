@@ -41,14 +41,23 @@ function Worlds() {
 
     setCreating(true)
     try {
+      console.log('Creating world:', newWorld)
       const created = await createWorld(newWorld)
+      console.log('World created:', created)
+      
+      // Update state first
       setWorlds([created, ...worlds])
       setShowCreate(false)
       setNewWorld({ name: '', setting: '', description: '' })
-      navigate(`/worlds/${created.id}`)
+      
+      // Navigate after a brief delay to ensure state updates
+      setTimeout(() => {
+        navigate(`/worlds/${created.id}`)
+      }, 100)
+      
     } catch (error) {
       console.error('Failed to create world:', error)
-      alert('Failed to create world')
+      alert(`Failed to create world: ${error.message}`)
     } finally {
       setCreating(false)
     }

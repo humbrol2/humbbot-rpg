@@ -84,7 +84,7 @@ function GameSession() {
   }
 
   return (
-    <div className="game-session">
+    <div className="game-session enhanced-game-session h-screen overflow-hidden">
       <header className="session-header">
         <Link to={`/worlds/${session.world_id}`} className="back-link">← Back to World</Link>
         <h1>{session.name}</h1>
@@ -146,7 +146,7 @@ function GameSession() {
         </aside>
 
         <main className="game-main">
-          <div className="messages">
+          <div className="messages game-chat-container message-history-scroll messages-container">
             {session.current_scene && session.history?.length === 0 && (
               <div className="message gm-message intro">
                 <div className="message-header">

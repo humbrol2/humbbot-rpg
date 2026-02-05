@@ -269,30 +269,144 @@ function compressPrompt(prompt, targetTokens) {
 }
 
 /**
- * Generate GM response to player action with advanced prompt engineering
+ * Analyze request type for appropriate response style
+ */
+function analyzeRequestType(playerAction) {
+  const actionLower = playerAction.toLowerCase().trim();
+  
+  // Quick info requests - should be brief and direct
+  if (actionLower.includes('inventory') || actionLower.includes('items') || actionLower.includes('equipment')) {
+    return { type: 'inventory', brief: true, maxTokens: 200 };
+  }
+  
+  if (actionLower.includes('stats') || actionLower.includes('attributes') || actionLower.includes('health') || actionLower.includes('hp')) {
+    return { type: 'stats', brief: true, maxTokens: 150 };
+  }
+  
+  if (actionLower.includes('look around') || actionLower.match(/^(look|l)$/)) {
+    return { type: 'look', brief: false, maxTokens: 400 };
+  }
+  
+  // Combat actions - medium length with clear results
+  if (actionLower.includes('attack') || actionLower.includes('fight') || actionLower.includes('cast') || actionLower.includes('defend')) {
+    return { type: 'combat', brief: false, maxTokens: 600 };
+  }
+  
+  // Dialogue - variable length based on context
+  if (actionLower.includes('say') || actionLower.includes('ask') || actionLower.includes('tell') || playerAction.includes('"')) {
+    return { type: 'dialogue', brief: false, maxTokens: 500 };
+  }
+  
+  // Investigation - medium detail
+  if (actionLower.includes('search') || actionLower.includes('examine') || actionLower.includes('investigate')) {
+    return { type: 'investigation', brief: false, maxTokens: 500 };
+  }
+  
+  // Default story action
+  return { type: 'story', brief: false, maxTokens: 800 };
+}
+
+/**
+ * Build response style instructions based on request type
+ */
+function buildResponseStyleInstructions(requestType) {
+  const styles = {
+    inventory: `RESPONSE TYPE: INVENTORY CHECK
+- List items concisely in a simple format
+- No narrative fluff or scene description
+- Just the facts: item names and brief descriptions
+- Format: "Your inventory contains:" followed by bulleted list
+- Keep under 3-4 lines total`,
+    
+    stats: `RESPONSE TYPE: CHARACTER STATUS
+- Show current stats/health/status effects only
+- No scene description or narrative
+- Simple, clear format
+- Include only what's asked for`,
+    
+    look: `RESPONSE TYPE: ENVIRONMENT DESCRIPTION
+- Describe the immediate surroundings
+- Include exits, notable objects, NPCs
+- 2-3 paragraphs maximum
+- Focus on what's visible and interactive`,
+    
+    combat: `RESPONSE TYPE: COMBAT ACTION
+- Resolve the action clearly
+- Show immediate results
+- Include dice rolls if needed: [ROLL:skill:difficulty]
+- Brief aftermath description
+- End with current tactical situation`,
+    
+    dialogue: `RESPONSE TYPE: DIALOGUE/SOCIAL
+- Focus on NPC responses and reactions
+- Include relevant body language/tone
+- Show immediate consequences of what was said
+- Keep social interactions flowing`,
+    
+    investigation: `RESPONSE TYPE: INVESTIGATION
+- Detail what is found/discovered
+- Include skill check results if applicable
+- Provide actionable information
+- Suggest possible next steps`,
+    
+    story: `RESPONSE TYPE: GENERAL STORY
+- Balance action and description
+- Keep 2-4 paragraphs unless epic moment
+- End with clear situation for player response
+- Maintain setting atmosphere`
+  };
+  
+  return styles[requestType.type] || styles.story;
+}
+
+/**
+ * Generate GM response to player action with request-aware prompt engineering
  */
 export async function generateGMResponse(world, session, playerAction, memory = null, options = {}) {
   const { 
     temperature = 0.8, 
-    maxTokens = 800, 
     recordAction = true,
     sceneType = 'story',
     importance = 0.5,
     style = 'balanced'
   } = options;
   
-  // Build advanced system prompt with memory context and constraint engine
-  const promptBuilder = new AdvancedPromptBuilder(world, { style, contextBudget: 4000 });
-  const systemPrompt = await promptBuilder.buildPrompt(session, memory, {
-    sceneType,
-    importance,
-    contextBudget: 4000,
-    includeMemory: memory !== null
-  });
+  // Analyze the request type to determine appropriate response style
+  const requestType = analyzeRequestType(playerAction);
+  const maxTokens = options.maxTokens || requestType.maxTokens;
+  
+  // Build focused system prompt based on request type
+  let systemPrompt;
+  
+  if (requestType.brief) {
+    // Brief informational prompt for quick requests
+    systemPrompt = `You are a Game Master for "${world.name}" (${getSettingConfig(world.setting).name}).
 
-  // Prepare message history with token management
+${buildResponseStyleInstructions(requestType)}
+
+Current Characters: ${session.characters?.map(c => `${c.name} (${c.class}, Level ${c.level})`).join(', ') || 'None'}
+
+Be direct and concise. No excessive narrative for simple information requests.`;
+    
+  } else {
+    // Full narrative prompt for story actions
+    const promptBuilder = new AdvancedPromptBuilder(world, { style, contextBudget: 3000 });
+    systemPrompt = await promptBuilder.buildPrompt(session, memory, {
+      sceneType,
+      importance,
+      contextBudget: 3000,
+      includeMemory: memory !== null,
+      responseStyle: requestType.type
+    });
+    
+    // Add response style instructions
+    systemPrompt += `\n\n${buildResponseStyleInstructions(requestType)}`;
+  }
+
+  // Prepare message history - less for brief requests
   const messageHistory = session.messageHistory || [];
-  const managedHistory = await manageMessageHistory(messageHistory, memory, 2000); // Reserve 2000 tokens for history
+  const historyBudget = requestType.brief ? 500 : 2000;
+  const managedHistory = await manageMessageHistory(messageHistory, memory, historyBudget);
 
   const messages = [
     { role: 'system', content: systemPrompt },
@@ -306,12 +420,12 @@ export async function generateGMResponse(world, session, playerAction, memory = 
   }
 
   const response = await chat(messages, {
-    temperature,
+    temperature: requestType.brief ? 0.3 : temperature, // Lower temperature for factual requests
     maxTokens
   });
 
   // Record GM response and any significant events it contains
-  if (memory) {
+  if (memory && !requestType.brief) {
     await recordGMResponse(memory, response, session);
   }
 

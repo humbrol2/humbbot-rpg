@@ -38,18 +38,23 @@ const EnhancedGameSession = () => {
       const sessionData = await sessionResponse.json()
       setSession(sessionData)
       
-      // Load world data
-      const worldResponse = await fetch(`/api/worlds/${sessionData.worldId}`)
+      // Load world data (use world_id from API response)
+      const worldResponse = await fetch(`/api/worlds/${sessionData.world_id}`)
       if (worldResponse.ok) {
         const worldData = await worldResponse.json()
         setWorld(worldData)
       }
       
-      // Load message history
-      const messagesResponse = await fetch(`/api/sessions/${sessionId}/messages`)
-      if (messagesResponse.ok) {
-        const messageData = await messagesResponse.json()
-        setMessages(messageData)
+      // Use existing history from session data (basic sessions include history)
+      if (sessionData.history && sessionData.history.length > 0) {
+        // Convert to the format expected by the component
+        const formattedMessages = sessionData.history.map((msg, index) => ({
+          id: index,
+          role: msg.role === 'user' ? 'player' : 'gm',
+          content: msg.content,
+          timestamp: new Date(msg.created_at).getTime()
+        }))
+        setMessages(formattedMessages)
       }
       
       // Set default character
@@ -85,15 +90,13 @@ const EnhancedGameSession = () => {
       setMessages(prev => [...prev, playerMessage])
       setCurrentAction('')
       
-      // Send action to server
+      // Send action to server (using basic sessions API for now)
       const response = await fetch(`/api/sessions/${sessionId}/action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action,
-          characterId: selectedCharacter.id,
-          sceneType,
-          importance: options.importance || 0.5,
+          character_id: selectedCharacter?.id,
           ...options
         })
       })
@@ -102,30 +105,19 @@ const EnhancedGameSession = () => {
       
       const result = await response.json()
       
-      // Add GM response
+      // Add GM response (basic sessions API format)
       const gmMessage = {
         id: Date.now() + 1,
         role: 'gm',
         content: result.response,
-        timestamp: Date.now(),
-        sceneType: result.sceneType,
-        importance: result.importance
+        timestamp: new Date(result.timestamp).getTime()
       }
       setMessages(prev => [...prev, gmMessage])
       
-      // Update session state
-      if (result.sessionUpdate) {
-        setSession(prev => ({ ...prev, ...result.sessionUpdate }))
-      }
-      
-      // Update memory statistics
-      if (result.memoryEvents !== undefined) {
-        setMemoryEvents(result.memoryEvents)
-      }
-      
-      if (result.contextUsage !== undefined) {
-        setContextUsage(result.contextUsage)
-      }
+      // For basic sessions, we don't have enhanced features yet
+      // But we can simulate some values for the UI
+      setMemoryEvents(prev => prev + 1)
+      setContextUsage(0.3) // Placeholder value
       
     } catch (error) {
       console.error('Failed to process action:', error)
@@ -190,7 +182,7 @@ const EnhancedGameSession = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-bg-primary">
+    <div className="enhanced-game-session h-screen flex flex-col bg-bg-primary overflow-hidden">
       {/* Session Header */}
       <div className="border-b border-border bg-bg-card">
         <div className="flex items-center justify-between p-4">
@@ -298,8 +290,8 @@ const EnhancedGameSession = () => {
         </div>
 
         {/* Center - Message History */}
-        <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 flex flex-col min-w-0 chat-messages-wrapper">
+          <div className="flex-1 game-chat-container message-history-scroll messages-container p-4">
             <MessageHistory
               messages={messages}
               world={world}
