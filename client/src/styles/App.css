@@ -809,27 +809,28 @@
 
 /* Enhanced Game Session Message History Scrolling */
 .messages-container {
-  scrollbar-width: thin;
-  scrollbar-color: var(--accent) var(--bg-secondary);
+  scrollbar-width: auto !important;
+  scrollbar-color: #e94560 #2a2a2a !important;
 }
 
 .messages-container::-webkit-scrollbar {
-  width: 14px;
+  width: 16px !important;
+  background: #2a2a2a !important;
 }
 
 .messages-container::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
+  background: #2a2a2a !important;
   border-radius: 8px;
 }
 
 .messages-container::-webkit-scrollbar-thumb {
-  background: var(--accent);
+  background: #e94560 !important;
   border-radius: 8px;
-  border: 3px solid var(--bg-secondary);
+  border: 2px solid #2a2a2a !important;
 }
 
 .messages-container::-webkit-scrollbar-thumb:hover {
-  background: var(--primary-600);
+  background: #ff4c6a !important;
 }
 
 /* Ensure scroll container has proper height */
@@ -862,17 +863,7 @@
   flex-direction: column;
 }
 
-/* Force scrollbar visibility */
-.messages-container::-webkit-scrollbar {
-  width: 16px !important;
-  background: var(--bg-secondary);
-}
-
-.messages-container::-webkit-scrollbar-thumb {
-  background: var(--accent) !important;
-  border-radius: 8px;
-  border: 3px solid var(--bg-secondary);
-}
+/* Removed duplicate scrollbar rules - consolidated above */
 
 /* Job board formatting */
 .job-board-container {

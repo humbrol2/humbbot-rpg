@@ -290,12 +290,13 @@ const EnhancedGameSession = () => {
         </div>
 
         {/* Center - Message History */}
-        <div className="flex-1 flex flex-col min-w-0 chat-messages-wrapper">
-          <div className="flex-1 game-chat-container message-history-scroll messages-container p-4" style={{maxHeight: 'calc(100vh - 300px)'}}>
+        <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex-1 p-4" style={{height: 'calc(100vh - 300px)', overflow: 'hidden'}}>
             <MessageHistory
               messages={messages}
               world={world}
               isProcessing={isProcessing}
+              className="h-full overflow-y-auto messages-container"
             />
             <div ref={messagesEndRef} />
           </div>

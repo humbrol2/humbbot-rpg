@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 
-const MessageHistory = ({ messages, world, isProcessing }) => {
+const MessageHistory = ({ messages, world, isProcessing, className = '' }) => {
   const [filter, setFilter] = useState('all')
   const [isAutoScroll, setIsAutoScroll] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -77,29 +77,44 @@ const MessageHistory = ({ messages, world, isProcessing }) => {
   }
 
   const formatMessageContent = (content) => {
-    // First, preserve line breaks by converting to HTML
-    content = content.replace(/\n\n/g, '<br><br>')
-    content = content.replace(/\n/g, '<br>')
+    if (!content) return '';
     
-    // Format dice rolls
-    content = content.replace(/\[ROLL:(\w+):(\w+)\]/g, 
-      '<span class="inline-flex items-center gap-1 px-2 py-1 bg-primary-500 bg-opacity-20 rounded text-primary-400 font-mono text-sm">🎲 $1 ($2)</span>')
+    // Split into lines for better processing
+    let lines = content.split('\n');
+    let formattedLines = [];
     
-    // Format emphasis (bold/italic)
-    content = content.replace(/\*\*(.*?)\*\*/g, '<strong class="text-primary-200 font-bold">$1</strong>')
-    content = content.replace(/\*(.*?)\*/g, '<em>$1</em>')
+    for (let line of lines) {
+      // Skip empty lines but preserve spacing
+      if (line.trim() === '') {
+        formattedLines.push('<div class="h-3"></div>');
+        continue;
+      }
+      
+      // Format dice rolls
+      line = line.replace(/\[ROLL:(\w+):(\w+)\]/g, 
+        '<span class="inline-flex items-center gap-1 px-2 py-1 bg-primary-500 bg-opacity-20 rounded text-primary-400 font-mono text-sm">🎲 $1 ($2)</span>');
+      
+      // Format emphasis (bold/italic)
+      line = line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-primary-200 font-bold text-lg">$1</strong>');
+      line = line.replace(/\*(.*?)\*/g, '<em>$1</em>');
+      
+      // Format dialogue
+      line = line.replace(/"([^"]+)"/g, '<span class="text-primary-300">"$1"</span>');
+      
+      // Format bullet points
+      if (line.trim().startsWith('•')) {
+        const bulletContent = line.replace(/^•\s*/, '');
+        formattedLines.push(`<div class="flex items-start mb-2 ml-4"><span class="text-accent mr-3 mt-1">•</span><div class="flex-1">${bulletContent}</div></div>`);
+      } else {
+        formattedLines.push(`<div class="mb-2">${line}</div>`);
+      }
+    }
     
-    // Format dialogue
-    content = content.replace(/"([^"]+)"/g, '<span class="text-primary-300">"$1"</span>')
-    
-    // Format bullet points with better spacing
-    content = content.replace(/(^|\<br\>)• (.+?)(?=\<br\>|$)/g, '$1<div class="ml-4 mb-2 flex items-start"><span class="text-accent mr-2">•</span><span>$2</span></div>')
-    
-    return content
+    return formattedLines.join('');
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className={`flex flex-col h-full ${className}`}>
       {/* Message Controls */}
       <div className="flex items-center gap-4 mb-4 pb-4 border-b border-border">
         <div className="flex items-center gap-2">
