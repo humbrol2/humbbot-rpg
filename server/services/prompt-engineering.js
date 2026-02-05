@@ -478,6 +478,7 @@ Your core responsibilities:
     const styleMap = {
       inventory: 'Focus on listing items concisely with minimal narrative',
       stats: 'Provide clear character status with no extra description',
+      jobs: 'List available work/jobs in organized bullet format with pay/requirements',
       look: 'Describe environment systematically with useful details',
       combat: 'Emphasize action resolution and tactical outcomes',
       dialogue: 'Focus on NPC responses and social dynamics',

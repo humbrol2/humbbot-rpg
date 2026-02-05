@@ -61,6 +61,13 @@ const CharacterPanel = ({ characters, selectedCharacter, onCharacterSelect }) =>
                       <p className="text-sm text-muted">
                         {character.class} • Level {character.level}
                       </p>
+                      {/* Credits Display */}
+                      <div className="flex items-center gap-1 text-sm">
+                        <span className="text-warning">💳</span>
+                        <span className="text-primary font-medium">
+                          {(character.credits || 1000).toLocaleString()} credits
+                        </span>
+                      </div>
                     </div>
                     {selectedCharacter?.id === character.id && (
                       <div className="badge badge-success">Active</div>

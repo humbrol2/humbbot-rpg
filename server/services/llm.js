@@ -283,6 +283,11 @@ function analyzeRequestType(playerAction) {
     return { type: 'stats', brief: true, maxTokens: 150 };
   }
   
+  if (actionLower.includes('job board') || actionLower.includes('jobs') || actionLower.includes('work') || 
+      actionLower.includes('employment') || actionLower.includes('tasks') || actionLower.includes('missions')) {
+    return { type: 'jobs', brief: true, maxTokens: 300 };
+  }
+  
   if (actionLower.includes('look around') || actionLower.match(/^(look|l)$/)) {
     return { type: 'look', brief: false, maxTokens: 400 };
   }
@@ -323,6 +328,14 @@ function buildResponseStyleInstructions(requestType) {
 - No scene description or narrative
 - Simple, clear format
 - Include only what's asked for`,
+    
+    jobs: `RESPONSE TYPE: JOB/WORK LISTING
+- List available jobs/work/tasks with clear line breaks between each job
+- Format: Job Title | Pay: X credits/hour | Requirements: Y | Brief description
+- Use double line breaks (\\n\\n) between each job entry
+- Start each job with "**Job Title**" in bold
+- NO run-on sentences or walls of text
+- Maximum 3-4 jobs total for readability`,
     
     look: `RESPONSE TYPE: ENVIRONMENT DESCRIPTION
 - Describe the immediate surroundings

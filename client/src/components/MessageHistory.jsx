@@ -77,6 +77,10 @@ const MessageHistory = ({ messages, world, isProcessing }) => {
   }
 
   const formatMessageContent = (content) => {
+    // Convert line breaks to HTML breaks
+    content = content.replace(/\n\n/g, '<br><br>')
+    content = content.replace(/\n/g, '<br>')
+    
     // Format dice rolls
     content = content.replace(/\[ROLL:(\w+):(\w+)\]/g, 
       '<span class="inline-flex items-center gap-1 px-2 py-1 bg-primary-500 bg-opacity-20 rounded text-primary-400 font-mono text-sm">🎲 $1 ($2)</span>')
@@ -87,6 +91,9 @@ const MessageHistory = ({ messages, world, isProcessing }) => {
     
     // Format dialogue
     content = content.replace(/"([^"]+)"/g, '<span class="text-primary-300">"$1"</span>')
+    
+    // Format bullet points
+    content = content.replace(/^• (.+)$/gm, '<div class="ml-4 mb-1">• $1</div>')
     
     return content
   }

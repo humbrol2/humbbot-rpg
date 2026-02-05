@@ -81,13 +81,30 @@ export default async function characterRoutes(fastify) {
 
     // Use setting-specific default attributes if none provided
     const finalAttributes = attributes || getDefaultAttributes(world.setting);
+    
+    // Set starting credits based on setting
+    const getStartingCredits = (setting) => {
+      const creditMap = {
+        'fantasy': 100,      // gold coins
+        'scifi': 1000,       // credits
+        'horror': 50,        // dollars/pounds
+        'steampunk': 200,    // pounds sterling
+        'western': 100,      // dollars
+        'cyberpunk': 2000,   // credits
+        'post-apocalyptic': 20, // bottle caps/scrip
+        'superhero': 500     // dollars
+      };
+      return creditMap[setting] || 1000;
+    };
+    
+    const startingCredits = getStartingCredits(world.setting);
 
     const id = uuid();
     const now = new Date().toISOString();
 
     execute(
-      `INSERT INTO characters (id, world_id, player_id, name, class, level, attributes, skills, inventory, backstory, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO characters (id, world_id, player_id, name, class, level, attributes, skills, inventory, backstory, notes, credits, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         world_id,
@@ -100,6 +117,7 @@ export default async function characterRoutes(fastify) {
         JSON.stringify(inventory),
         backstory || null,
         notes || null,
+        startingCredits,
         now,
         now
       ]
