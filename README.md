@@ -1,15 +1,22 @@
 # 🎲 HumbBot RPG
 
-A web-based RPG game engine powered by **local LLMs** (llama.cpp). Create any world, build any character, play any adventure — all running on your own hardware.
+A web-based RPG game engine powered by **local LLMs** with advanced **memory architecture**. Create persistent worlds where NPCs remember your actions, relationships evolve over time, and every choice has lasting consequences.
 
 ## ✨ Features
 
-- **Any Setting**: Fantasy, Sci-Fi, Horror, or create your own
-- **D&D-Style Characters**: Attributes, skills, classes, inventory
-- **AI Game Master**: Powered by local models (Qwen, Llama, Mistral)
-- **Persistent Worlds**: Create, explore, and evolve your worlds
-- **No Cloud Required**: 100% local, no API costs, complete privacy
-- **Multiplayer** (coming soon): Play with friends in real-time
+### 🧠 **Advanced Memory System**
+- **4-Tier Memory Architecture**: Hot → Warm → Cool → Cold → Archived
+- **Intelligent Forgetting**: ClawMark-inspired intentional memory decay
+- **NPC Relationship Tracking**: Characters remember and react to past interactions
+- **Context Window Management**: Proactive compression prevents information loss
+- **Event Significance Scoring**: Important moments persist longer than routine actions
+
+### 🎭 **Any Setting, Persistent Experience**
+- **Fantasy, Sci-Fi, Horror**: Or create your own with setting-specific memory patterns
+- **D&D-Style Characters**: Attributes, skills, classes with relationship tracking
+- **AI Game Master**: Context-aware prompts with memory-guided continuity
+- **Living Worlds**: Places and NPCs evolve based on your lasting impact
+- **No Cloud Required**: 100% local with complete memory persistence
 
 ## 🚀 Quick Start
 
@@ -65,11 +72,21 @@ humbbot-rpg/
 
 ## 🎮 How It Works
 
-1. **Create a World** — Choose a setting or build your own
-2. **Build Characters** — Roll stats, pick skills, write backstory
-3. **Start a Session** — The AI GM narrates your adventure
-4. **Play** — Describe actions, roll dice, shape the story
-5. **Save & Continue** — Your world persists between sessions
+1. **Create a World** — Choose a setting with persistent memory architecture
+2. **Build Characters** — Stats, skills, backstory with relationship tracking
+3. **Start a Session** — AI GM with full memory of past adventures
+4. **Take Actions** — Every choice is remembered and influences future encounters
+5. **Build Relationships** — NPCs remember your words and react accordingly
+6. **Experience Consequences** — Past decisions ripple through ongoing storylines
+7. **Seamless Continuity** — Pick up exactly where you left off, even months later
+
+### Memory-Enhanced Features
+- **"Remember when you..."** — NPCs reference past conversations naturally
+- **Evolving Relationships** — Trust, respect, and reputation build over time
+- **Persistent Consequences** — Early decisions continue to matter sessions later
+- **Living World** — Locations change based on your historical impact
+
+For detailed technical information, see [MEMORY.md](./MEMORY.md).
 
 ## 🤝 Contributing
 

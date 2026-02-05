@@ -9,6 +9,8 @@
  */
 
 import { SETTINGS, getSettingConfig } from '../../shared/settings.js';
+import { AdvancedPromptBuilder } from './prompt-engineering.js';
+import RPGMemoryManager from './memory.js';
 
 const LLM_BASE_URL = process.env.LLM_BASE_URL || 'http://127.0.0.1:8080/v1';
 
@@ -98,10 +100,11 @@ ${setting === 'post-apocalyptic' ? '- NO pristine modern conveniences, everythin
 }
 
 /**
- * Game Master system prompt builder
+ * Advanced Game Master system prompt builder with memory context
+ * Incorporates Moltbook memory community patterns
  */
-export function buildGMPrompt(world, session, options = {}) {
-  const { style = 'balanced', rulesStrict = false } = options;
+export async function buildGMPrompt(world, session, memory = null, options = {}) {
+  const { style = 'balanced', rulesStrict = false, contextBudget = 4000 } = options;
   const config = getSettingConfig(world.setting);
 
   const styleDescriptions = {
@@ -111,60 +114,435 @@ export function buildGMPrompt(world, session, options = {}) {
     grimdark: 'Emphasize danger, consequence, and moral ambiguity. The world is harsh.'
   };
 
-  return `You are the Game Master for "${world.name}", a ${config.name} role-playing game.
+  // Build character context with relationships
+  const characterContext = session.characters?.map(c => {
+    const attrs = Object.entries(c.attributes || {})
+      .map(([k, v]) => `${k}:${v}`)
+      .join(', ');
+    
+    let charDesc = `- ${c.name} (${c.class || 'Adventurer'}, Level ${c.level}) [${attrs}]`;
+    
+    // Add relationship context if available
+    if (c.relationships && Object.keys(c.relationships).length > 0) {
+      const relationships = Object.entries(c.relationships)
+        .map(([target, value]) => `${target}:${value > 0 ? '+' : ''}${value}`)
+        .join(', ');
+      charDesc += ` {${relationships}}`;
+    }
+    
+    // Add recent status effects or conditions
+    if (c.conditions && c.conditions.length > 0) {
+      charDesc += ` <${c.conditions.join(', ')}>`;
+    }
+    
+    return charDesc;
+  }).join('\n') || 'No characters yet';
+
+  // Get memory context if memory manager available
+  let memoryContext = '';
+  if (memory) {
+    try {
+      memoryContext = await memory.buildMemoryContext(session.currentScene, session.characters || []);
+    } catch (e) {
+      console.warn('Failed to build memory context:', e.message);
+      memoryContext = "## Recent History\n" + (session.recentHistory?.slice(-5).join('\n') || 'Session just started.');
+    }
+  } else {
+    memoryContext = "## Recent History\n" + (session.recentHistory?.slice(-5).join('\n') || 'Session just started.');
+  }
+
+  // Current scene context with environment details
+  const sceneContext = buildSceneContext(session.currentScene);
+
+  // Construct the full prompt
+  const basePrompt = `You are the Game Master for "${world.name}", a ${config.name} role-playing game.
 
 ${buildSettingFlavor(world.setting)}
 
-## Your Role
+## Your Role & Style
 ${styleDescriptions[style] || styleDescriptions.balanced}
 
 ## World Description
 ${world.description || `A ${config.name} world awaiting adventure.`}
 
-## Current Scene
-${session.currentScene || 'The adventure begins...'}
+${sceneContext}
 
 ## Active Characters
-${session.characters?.map(c => {
-  const attrs = Object.entries(c.attributes || {})
-    .map(([k, v]) => `${k}:${v}`)
-    .join(', ');
-  return `- ${c.name} (${c.class || 'Adventurer'}, Level ${c.level}) [${attrs}]`;
-}).join('\n') || 'No characters yet'}
+${characterContext}
 
-## Game Rules
+## Game Rules & Mechanics
 ${rulesStrict ? 
   '- Strictly enforce game rules and character limitations' :
   '- Favor fun and narrative over strict rules when appropriate'}
 - When an action has uncertain outcome, indicate a roll: [ROLL:${config.skills[0] || 'skill'}:difficulty]
-- Use the setting's skill list for rolls: ${config.skills.slice(0, 5).join(', ')}...
-- Keep responses focused (2-4 paragraphs max)
+- Available skills for rolls: ${config.skills.join(', ')}
+- Keep responses focused (2-4 paragraphs max unless epic moment)
 - End scenes with clear situation or choice for players
 - NEVER control player characters - only NPCs and environment
 - ALL descriptions must fit the ${config.name} setting - no anachronisms!
+- Track relationship changes and mention them when relevant
+- Remember character personalities and past decisions
 
-## Recent Events
-${session.recentHistory?.slice(-5).join('\n') || 'Session just started.'}`;
+${memoryContext}
+
+## Context Management Notes
+- This session has generated significant events that shape the ongoing story
+- Character decisions have consequences that ripple through the narrative
+- NPCs remember past interactions and react accordingly
+- The world evolves based on player actions`;
+
+  // Check token budget and compress if needed
+  const estimatedTokens = Math.ceil(basePrompt.length / 4);
+  if (estimatedTokens > contextBudget * 0.8) {
+    console.log(`🧠 GM prompt approaching token limit (${estimatedTokens}/${contextBudget}), optimizing...`);
+    return compressPrompt(basePrompt, contextBudget);
+  }
+
+  return basePrompt;
 }
 
 /**
- * Generate GM response to player action
+ * Build detailed scene context
  */
-export async function generateGMResponse(world, session, playerAction, options = {}) {
-  const systemPrompt = buildGMPrompt(world, session, options);
+function buildSceneContext(currentScene) {
+  if (!currentScene) {
+    return "## Current Scene\nThe adventure is about to begin...";
+  }
+
+  let context = `## Current Scene: ${currentScene.name || 'Untitled Scene'}
+**Location:** ${currentScene.location || 'Unknown location'}`;
+
+  if (currentScene.description) {
+    context += `\n**Description:** ${currentScene.description}`;
+  }
+
+  if (currentScene.npcs && currentScene.npcs.length > 0) {
+    context += `\n**NPCs Present:** ${currentScene.npcs.map(npc => 
+      `${npc.name} (${npc.disposition || 'neutral'})`
+    ).join(', ')}`;
+  }
+
+  if (currentScene.threats && currentScene.threats.length > 0) {
+    context += `\n**Potential Threats:** ${currentScene.threats.join(', ')}`;
+  }
+
+  if (currentScene.opportunities && currentScene.opportunities.length > 0) {
+    context += `\n**Opportunities:** ${currentScene.opportunities.join(', ')}`;
+  }
+
+  if (currentScene.atmosphere) {
+    context += `\n**Atmosphere:** ${currentScene.atmosphere}`;
+  }
+
+  return context;
+}
+
+/**
+ * Compress prompt when approaching token limits
+ * Implements "ClawMark" intentional forgetting
+ */
+function compressPrompt(prompt, targetTokens) {
+  const sections = prompt.split('\n## ');
+  const priorities = {
+    'Your Role & Style': 0.9,
+    'World Description': 0.8,
+    'Current Scene': 1.0,
+    'Active Characters': 0.95,
+    'Game Rules & Mechanics': 0.85,
+    'Memory Context': 0.7,  // Most compressible
+    'Context Management Notes': 0.3
+  };
+
+  // Compress memory context first
+  const memorySection = sections.find(s => s.startsWith('Memory Context'));
+  if (memorySection) {
+    const lines = memorySection.split('\n');
+    if (lines.length > 10) {
+      // Keep only most recent and most significant events
+      const compressed = lines.slice(0, 5).concat(['...', '[Earlier events available on request]', '']);
+      const index = sections.indexOf(memorySection);
+      sections[index] = compressed.join('\n');
+    }
+  }
+
+  return sections.join('\n## ');
+}
+}
+
+/**
+ * Generate GM response to player action with advanced prompt engineering
+ */
+export async function generateGMResponse(world, session, playerAction, memory = null, options = {}) {
+  const { 
+    temperature = 0.8, 
+    maxTokens = 800, 
+    recordAction = true,
+    sceneType = 'story',
+    importance = 0.5,
+    style = 'balanced'
+  } = options;
+  
+  // Build advanced system prompt with memory context and constraint engine
+  const promptBuilder = new AdvancedPromptBuilder(world, { style, contextBudget: 4000 });
+  const systemPrompt = await promptBuilder.buildPrompt(session, memory, {
+    sceneType,
+    importance,
+    contextBudget: 4000,
+    includeMemory: memory !== null
+  });
+
+  // Prepare message history with token management
+  const messageHistory = session.messageHistory || [];
+  const managedHistory = await manageMessageHistory(messageHistory, memory, 2000); // Reserve 2000 tokens for history
 
   const messages = [
     { role: 'system', content: systemPrompt },
-    ...session.messageHistory || [],
+    ...managedHistory,
     { role: 'user', content: playerAction }
   ];
 
+  // Record the player action in memory if memory manager available
+  if (memory && recordAction) {
+    await recordPlayerAction(memory, playerAction, session);
+  }
+
   const response = await chat(messages, {
-    temperature: 0.8,
-    maxTokens: 800
+    temperature,
+    maxTokens
   });
 
+  // Record GM response and any significant events it contains
+  if (memory) {
+    await recordGMResponse(memory, response, session);
+  }
+
   return response;
+}
+
+/**
+ * Manage message history to fit within token budget
+ * Uses memory system patterns for intelligent truncation
+ */
+async function manageMessageHistory(history, memory, tokenBudget) {
+  if (!history || history.length === 0) return [];
+
+  // Estimate tokens for each message
+  const messagesWithTokens = history.map(msg => ({
+    ...msg,
+    estimatedTokens: Math.ceil((msg.content || '').length / 4)
+  }));
+
+  let totalTokens = 0;
+  const managedHistory = [];
+
+  // Always include the most recent messages
+  for (let i = messagesWithTokens.length - 1; i >= 0; i--) {
+    const msg = messagesWithTokens[i];
+    if (totalTokens + msg.estimatedTokens <= tokenBudget) {
+      managedHistory.unshift(msg);
+      totalTokens += msg.estimatedTokens;
+    } else {
+      break;
+    }
+  }
+
+  // If we had to truncate, add a summary of truncated content
+  const truncatedCount = history.length - managedHistory.length;
+  if (truncatedCount > 0 && memory) {
+    const summaryMsg = {
+      role: 'system',
+      content: `[${truncatedCount} earlier messages available in memory context above]`
+    };
+    managedHistory.unshift(summaryMsg);
+  }
+
+  return managedHistory;
+}
+
+/**
+ * Record player action in memory with context analysis
+ */
+async function recordPlayerAction(memory, action, session) {
+  try {
+    // Analyze action type and significance
+    const actionAnalysis = analyzePlayerAction(action);
+    
+    await memory.recordEvent('player_action', {
+      action,
+      type: actionAnalysis.type,
+      characters: session.characters?.map(c => c.name) || [],
+      location: session.currentScene?.location || 'unknown',
+      analysis: actionAnalysis
+    }, actionAnalysis.significance);
+
+    // Record specific event types
+    if (actionAnalysis.type === 'combat') {
+      await memory.recordCombat(
+        actionAnalysis.participants || [],
+        'initiated',
+        []
+      );
+    } else if (actionAnalysis.type === 'dialogue') {
+      await memory.recordDialogue(
+        'Player',
+        action,
+        {}
+      );
+    }
+  } catch (error) {
+    console.warn('Failed to record player action in memory:', error);
+  }
+}
+
+/**
+ * Record GM response and extract significant events
+ */
+async function recordGMResponse(memory, response, session) {
+  try {
+    // Extract events from GM response
+    const events = extractEventsFromResponse(response);
+    
+    for (const event of events) {
+      switch (event.type) {
+        case 'npc_dialogue':
+          await memory.recordDialogue(event.speaker, event.content, event.reactions);
+          break;
+        case 'combat_result':
+          await memory.recordCombat(event.participants, event.outcome, event.casualties);
+          break;
+        case 'location_change':
+          await memory.recordLocationChange(event.from, event.to, event.method);
+          break;
+        case 'character_development':
+          await memory.recordCharacterDevelopment(event.character, event.developmentType, event.details);
+          break;
+      }
+    }
+
+    // Record the response itself as a GM action
+    await memory.recordEvent('gm_response', {
+      response: response.substring(0, 500) + (response.length > 500 ? '...' : ''),
+      extractedEvents: events.length,
+      location: session.currentScene?.location || 'unknown'
+    }, events.length > 0 ? 0.6 : 0.3);
+
+  } catch (error) {
+    console.warn('Failed to record GM response in memory:', error);
+  }
+}
+
+/**
+ * Analyze player action to determine type and significance
+ */
+function analyzePlayerAction(action) {
+  const actionLower = action.toLowerCase();
+  
+  // Combat actions
+  if (actionLower.includes('attack') || actionLower.includes('fight') || 
+      actionLower.includes('shoot') || actionLower.includes('cast') ||
+      actionLower.includes('defend')) {
+    return {
+      type: 'combat',
+      significance: 0.8,
+      participants: extractMentionedCharacters(action)
+    };
+  }
+  
+  // Dialogue actions
+  if (actionLower.includes('say') || actionLower.includes('tell') || 
+      actionLower.includes('ask') || actionLower.includes('speak') ||
+      action.includes('"')) {
+    return {
+      type: 'dialogue',
+      significance: 0.5,
+      participants: extractMentionedCharacters(action)
+    };
+  }
+  
+  // Movement actions
+  if (actionLower.includes('go') || actionLower.includes('move') || 
+      actionLower.includes('travel') || actionLower.includes('enter') ||
+      actionLower.includes('leave')) {
+    return {
+      type: 'movement',
+      significance: 0.4
+    };
+  }
+  
+  // Investigation actions
+  if (actionLower.includes('search') || actionLower.includes('examine') || 
+      actionLower.includes('investigate') || actionLower.includes('look')) {
+    return {
+      type: 'investigation',
+      significance: 0.3
+    };
+  }
+  
+  // Default action
+  return {
+    type: 'general',
+    significance: 0.2
+  };
+}
+
+/**
+ * Extract mentioned characters from text
+ */
+function extractMentionedCharacters(text) {
+  // This is a simple implementation - could be enhanced with NER
+  const words = text.split(/\s+/);
+  const potentialNames = words.filter(word => 
+    word[0] === word[0].toUpperCase() && 
+    word.length > 2 && 
+    !['I', 'The', 'A', 'An'].includes(word)
+  );
+  return potentialNames;
+}
+
+/**
+ * Extract events from GM response text
+ */
+function extractEventsFromResponse(response) {
+  const events = [];
+  
+  // Look for dialogue patterns
+  const dialogueMatches = response.match(/"([^"]+)"/g);
+  if (dialogueMatches) {
+    dialogueMatches.forEach(match => {
+      const beforeQuote = response.substring(0, response.indexOf(match));
+      const speakerMatch = beforeQuote.match(/(\w+)\s+(?:says?|tells?|asks?|shouts?)/i);
+      if (speakerMatch) {
+        events.push({
+          type: 'npc_dialogue',
+          speaker: speakerMatch[1],
+          content: match.replace(/"/g, ''),
+          reactions: {}
+        });
+      }
+    });
+  }
+  
+  // Look for combat results
+  if (response.match(/\b(dies?|killed|defeated|wounded|injured)\b/i)) {
+    events.push({
+      type: 'combat_result',
+      participants: extractMentionedCharacters(response),
+      outcome: 'combat resolved',
+      casualties: []
+    });
+  }
+  
+  // Look for location changes
+  const locationMatch = response.match(/(?:arrive|enter|reach|travel to)\s+(?:the\s+)?([^.]+)/i);
+  if (locationMatch) {
+    events.push({
+      type: 'location_change',
+      to: locationMatch[1].trim(),
+      method: 'travel'
+    });
+  }
+  
+  return events;
 }
 
 /**
