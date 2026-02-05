@@ -267,7 +267,6 @@ function compressPrompt(prompt, targetTokens) {
 
   return sections.join('\n## ');
 }
-}
 
 /**
  * Generate GM response to player action with advanced prompt engineering
