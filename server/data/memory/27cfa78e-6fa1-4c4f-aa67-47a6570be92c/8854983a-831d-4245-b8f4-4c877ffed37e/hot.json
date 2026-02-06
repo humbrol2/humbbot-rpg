@@ -1,0 +1,16 @@
+[
+  {
+    "id": "1770342652517-o5i4ixn1p",
+    "type": "session_start",
+    "timestamp": 1770342652517,
+    "data": {
+      "world": "Memory Test World",
+      "setting": "fantasy",
+      "startTime": 1770342652517
+    },
+    "significance": 0.8,
+    "tier": "HOT",
+    "accessCount": 0,
+    "lastAccessed": 1770342652517
+  }
+]

@@ -1,0 +1,27 @@
+{
+  "1770342600858-x31ojpkhe": {
+    "type": "session_start",
+    "significance": 0.8,
+    "timestamp": 1770342601102,
+    "world": "Debug World",
+    "setting": "fantasy",
+    "startTime": 1770342600858,
+    "text": "Event type session_start: {\"world\":\"Debug World\",\"setting\":\"fantasy\",\"startTime\":1770342600858}",
+    "access_count": 1,
+    "last_accessed": 1770342601136
+  },
+  "1770342601138-zpkhofplk": {
+    "type": "investigation",
+    "significance": 0.3,
+    "timestamp": 1770342601152,
+    "action": "I look around the starting area",
+    "characters": [],
+    "location": "starting area",
+    "analysis": {
+      "type": "investigation",
+      "significance": 0.3
+    },
+    "text": "Event type player_action: {\"action\":\"I look around the starting area\",\"type\":\"investigation\",\"characters\":[],\"location\":\"starting area\",\"analysis\":{\"type\":\"investigation\",\"significance\":0.3}}",
+    "access_count": 0
+  }
+}

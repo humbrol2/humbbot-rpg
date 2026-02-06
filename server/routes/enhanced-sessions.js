@@ -11,6 +11,101 @@ const activeSessions = new Map() // Store active enhanced session managers
 
 export default async function enhancedSessionRoutes(fastify) {
 
+  // Create new enhanced session
+  fastify.post('/', async (request, reply) => {
+    const { worldId, characterIds = [], sessionType = 'enhanced', memoryEnabled = true } = request.body
+
+    if (!worldId) {
+      return reply.status(400).send({ error: 'World ID is required' })
+    }
+
+    try {
+      // Verify world exists
+      const world = queryOne('SELECT * FROM worlds WHERE id = ?', [worldId])
+      if (!world) {
+        return reply.status(404).send({ error: 'World not found' })
+      }
+
+      // Create session
+      const sessionId = uuid()
+      const now = Date.now()
+      
+      execute(
+        `INSERT INTO sessions (id, world_id, name, state, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          sessionId,
+          worldId,
+          `Enhanced Session ${new Date().toLocaleDateString()}`,
+          JSON.stringify({
+            sessionType,
+            memoryEnabled,
+            created: now,
+            characters: [],
+            currentScene: {
+              name: 'The Beginning',
+              location: 'starting area',
+              description: 'The adventure is about to begin...',
+              npcs: [],
+              threats: [],
+              opportunities: []
+            },
+            messageHistory: [],
+            recentHistory: [],
+            relationships: {},
+            questLog: [],
+            gameState: {
+              timeOfDay: 'morning',
+              weather: 'clear',
+              season: 'spring'
+            },
+            sessionStats: {
+              startTime: now,
+              actions: 0,
+              scenes: 1,
+              memoryEvents: 0
+            }
+          }),
+          now,
+          now
+        ]
+      )
+
+      // Add characters to session
+      for (const characterId of characterIds) {
+        // Verify character exists
+        const character = queryOne('SELECT * FROM characters WHERE id = ?', [characterId])
+        if (character) {
+          execute(
+            `INSERT INTO session_participants (session_id, character_id, joined_at)
+             VALUES (?, ?, ?)`,
+            [sessionId, characterId, now]
+          )
+        }
+      }
+
+      // Initialize enhanced session manager
+      if (memoryEnabled) {
+        const sessionManager = new EnhancedSessionManager(worldId, sessionId)
+        await sessionManager.initialize(world)
+        activeSessions.set(sessionId, sessionManager)
+      }
+
+      return {
+        id: sessionId,
+        worldId,
+        characterIds,
+        sessionType,
+        memoryEnabled,
+        status: 'active',
+        created: now
+      }
+    } catch (error) {
+      fastify.log.error(error)
+      return reply.status(500).send({ error: 'Failed to create session', details: error.message })
+    }
+  })
+
   // Get session with enhanced data
   fastify.get('/:id', async (request, reply) => {
     const { id } = request.params
@@ -24,10 +119,10 @@ export default async function enhancedSessionRoutes(fastify) {
 
       // Get participants (characters)
       const characters = queryAll(
-        `SELECT c.*, sc.joined_at, sc.active 
+        `SELECT c.*, sp.joined_at 
          FROM characters c
-         JOIN session_characters sc ON c.id = sc.character_id
-         WHERE sc.session_id = ?`,
+         JOIN session_participants sp ON c.id = sp.character_id
+         WHERE sp.session_id = ?`,
         [id]
       )
 
@@ -46,8 +141,7 @@ export default async function enhancedSessionRoutes(fastify) {
         ...session,
         characters: characters.map(char => ({
           ...char,
-          attributes: JSON.parse(char.attributes || '{}'),
-          active: char.active === 1
+          attributes: JSON.parse(char.attributes || '{}')
         })),
         state: sessionState,
         currentScene: sessionState.currentScene || {
@@ -299,6 +393,114 @@ export default async function enhancedSessionRoutes(fastify) {
     } catch (error) {
       fastify.log.error(error)
       return reply.status(500).send({ error: 'Failed to get session status' })
+    }
+  })
+
+  // Get session statistics (enhanced version)
+  fastify.get('/:id/stats', async (request, reply) => {
+    const { id } = request.params
+
+    try {
+      const session = queryOne('SELECT * FROM sessions WHERE id = ?', [id])
+      if (!session) {
+        return reply.status(404).send({ error: 'Session not found' })
+      }
+
+      let sessionManager = activeSessions.get(id)
+      if (!sessionManager) {
+        sessionManager = new EnhancedSessionManager(session.world_id, id)
+        await sessionManager.initialize()
+        activeSessions.set(id, sessionManager)
+      }
+
+      const memoryStats = await sessionManager.memory.getStats()
+      const sessionStatus = sessionManager.getSessionStatus()
+
+      return {
+        sessionStats: sessionStatus.sessionStats,
+        memoryEvents: sessionStatus.memoryStatus,
+        memoryStats: memoryStats,
+        performance: {
+          contextUsage: sessionManager.contextUsage,
+          lastMemoryFlush: sessionManager.lastMemoryFlush
+        }
+      }
+    } catch (error) {
+      fastify.log.error(error)
+      return reply.status(500).send({ error: 'Failed to get session statistics' })
+    }
+  })
+
+  // Search memory with natural language queries
+  fastify.post('/:id/search', async (request, reply) => {
+    const { id } = request.params
+    const { query, limit = 10, threshold = 0.3 } = request.body
+
+    if (!query?.trim()) {
+      return reply.status(400).send({ error: 'Search query is required' })
+    }
+
+    try {
+      const session = queryOne('SELECT * FROM sessions WHERE id = ?', [id])
+      if (!session) {
+        return reply.status(404).send({ error: 'Session not found' })
+      }
+
+      let sessionManager = activeSessions.get(id)
+      if (!sessionManager) {
+        sessionManager = new EnhancedSessionManager(session.world_id, id)
+        await sessionManager.initialize()
+        activeSessions.set(id, sessionManager)
+      }
+
+      // Use the enhanced memory search
+      const results = await sessionManager.memory.searchMemories(query, limit);
+
+      return {
+        query,
+        results,
+        total: results.length,
+        threshold
+      }
+    } catch (error) {
+      fastify.log.error(error)
+      return reply.status(500).send({ error: 'Memory search failed', details: error.message })
+    }
+  })
+
+  // Debug memory search (combining traditional + vector)
+  fastify.post('/:id/debug-search', async (request, reply) => {
+    const { id } = request.params
+    const { query } = request.body
+
+    if (!query?.trim()) {
+      return reply.status(400).send({ error: 'Search query is required' })
+    }
+
+    try {
+      const session = queryOne('SELECT * FROM sessions WHERE id = ?', [id])
+      if (!session) {
+        return reply.status(404).send({ error: 'Session not found' })
+      }
+
+      let sessionManager = activeSessions.get(id)
+      if (!sessionManager) {
+        sessionManager = new EnhancedSessionManager(session.world_id, id)
+        await sessionManager.initialize()
+        activeSessions.set(id, sessionManager)
+      }
+
+      const debugResults = await sessionManager.memory.debugMemorySearch(query);
+
+      return {
+        query,
+        traditional: debugResults.traditional,
+        vector: debugResults.vector,
+        hybridMode: sessionManager.memory.hybridMode
+      }
+    } catch (error) {
+      fastify.log.error(error)
+      return reply.status(500).send({ error: 'Debug search failed', details: error.message })
     }
   })
 }

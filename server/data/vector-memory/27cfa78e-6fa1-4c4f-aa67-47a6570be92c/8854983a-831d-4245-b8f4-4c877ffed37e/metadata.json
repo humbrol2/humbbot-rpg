@@ -1,0 +1,12 @@
+{
+  "1770342652517-o5i4ixn1p": {
+    "type": "session_start",
+    "significance": 0.8,
+    "timestamp": 1770342652651,
+    "world": "Memory Test World",
+    "setting": "fantasy",
+    "startTime": 1770342652517,
+    "text": "Event type session_start: {\"world\":\"Memory Test World\",\"setting\":\"fantasy\",\"startTime\":1770342652517}",
+    "access_count": 0
+  }
+}

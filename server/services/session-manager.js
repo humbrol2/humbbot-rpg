@@ -9,14 +9,14 @@
  * - Proactive memory compression
  */
 
-import RPGMemoryManager from './memory.js';
+import EnhancedRPGMemoryManager from './enhanced-memory.js';
 import { generateGMResponse } from './llm.js';
 
 export class EnhancedSessionManager {
   constructor(worldId, sessionId) {
     this.worldId = worldId;
     this.sessionId = sessionId;
-    this.memory = new RPGMemoryManager(worldId, sessionId);
+    this.memory = new EnhancedRPGMemoryManager(worldId, sessionId);
     this.session = null;
     this.contextUsage = 0;
     this.lastMemoryFlush = Date.now();
