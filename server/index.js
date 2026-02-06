@@ -10,6 +10,7 @@ import worldRoutes from './routes/worlds.js';
 import characterRoutes from './routes/characters.js';
 import sessionRoutes from './routes/sessions.js';
 import enhancedSessionRoutes from './routes/enhanced-sessions.js';
+import persistenceRoutes from './routes/persistence.js';
 import llmRoutes from './routes/llm.js';
 import { initDatabase } from './db/init.js';
 
@@ -54,6 +55,7 @@ async function start() {
     await fastify.register(characterRoutes, { prefix: '/api/characters' });
     await fastify.register(sessionRoutes, { prefix: '/api/sessions' });
     await fastify.register(enhancedSessionRoutes, { prefix: '/api/enhanced-sessions' });
+    await fastify.register(persistenceRoutes, { prefix: '/api/persistence' });
     await fastify.register(llmRoutes, { prefix: '/api/llm' });
 
     // Health check

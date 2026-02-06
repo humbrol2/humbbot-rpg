@@ -1,0 +1,27 @@
+{
+  "1770345371724-m5uswv0ck": {
+    "type": "session_start",
+    "significance": 0.8,
+    "timestamp": 1770345371869,
+    "world": "Persistence Test World",
+    "setting": "fantasy",
+    "startTime": 1770345371723,
+    "text": "Event type session_start: {\"world\":\"Persistence Test World\",\"setting\":\"fantasy\",\"startTime\":1770345371723}",
+    "access_count": 1,
+    "last_accessed": 1770345372687
+  },
+  "1770345372689-rmoh2lpdw": {
+    "type": "general",
+    "significance": 0.2,
+    "timestamp": 1770345372701,
+    "action": "I check my inventory and then talk to the Village Elder",
+    "characters": [],
+    "location": "starting area",
+    "analysis": {
+      "type": "general",
+      "significance": 0.2
+    },
+    "text": "Event type player_action: {\"action\":\"I check my inventory and then talk to the Village Elder\",\"type\":\"general\",\"characters\":[],\"location\":\"starting area\",\"analysis\":{\"type\":\"general\",\"significance\":0.2}}",
+    "access_count": 0
+  }
+}

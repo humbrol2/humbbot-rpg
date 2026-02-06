@@ -253,11 +253,27 @@ export default async function enhancedSessionRoutes(fastify) {
         activeSessions.set(id, sessionManager)
       }
 
-      // Process the action with memory integration
+      // Build enhanced context with persistent entities
+      const sessionState = JSON.parse(session.state || '{}');
+      const currentLocation = sessionState.currentScene?.location || 'unknown location';
+      const characters = queryAll(`
+        SELECT * FROM characters WHERE id IN (
+          SELECT character_id FROM session_participants WHERE session_id = ?
+        )
+      `, [id]);
+
+      // Get enhanced context including inventory, NPCs, buildings, etc.
+      const enhancedContext = await sessionManager.memory.buildEnhancedMemoryContext(
+        { location: currentLocation },
+        characters
+      );
+
+      // Process the action with enhanced memory integration
       const result = await sessionManager.processPlayerAction(world, action, {
         sceneType,
         importance,
-        style: 'balanced'
+        style: 'balanced',
+        enhancedContext
       })
 
       // Record action in database

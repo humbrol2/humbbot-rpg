@@ -6,6 +6,7 @@
 
 import RPGMemoryManager from './memory.js';
 import VectorMemoryEnhancer from './vector-memory.js';
+import RPGPersistenceManager from './persistence-manager.js';
 
 class EnhancedRPGMemoryManager extends RPGMemoryManager {
   constructor(worldId, sessionId, options = {}) {
@@ -16,19 +17,22 @@ class EnhancedRPGMemoryManager extends RPGMemoryManager {
       embeddingServiceUrl: options.embeddingServiceUrl || 'http://127.0.0.1:8082/v1/embeddings'
     });
     
+    this.persistenceManager = new RPGPersistenceManager(sessionId, this);
+    
     this.hybridMode = true; // Use both traditional and vector memory
     this.vectorWeight = 0.7; // Weight for vector vs traditional search
   }
 
   /**
-   * Initialize both memory systems
+   * Initialize both memory systems and persistence
    */
   async initialize() {
     await Promise.all([
       super.initialize(),
-      this.vectorMemory.initialize()
+      this.vectorMemory.initialize(),
+      RPGPersistenceManager.initializeTables()
     ]);
-    console.log('🧠 Enhanced RPG memory system ready');
+    console.log('🧠 Enhanced RPG memory system with persistence ready');
   }
 
   /**
@@ -274,6 +278,192 @@ class EnhancedRPGMemoryManager extends RPGMemoryManager {
     await this.vectorMemory.saveVectorStore();
     
     console.log('🧠 Enhanced memory compression complete');
+  }
+
+  // ==================== PERSISTENCE INTEGRATION ====================
+
+  /**
+   * Add item to character inventory with memory tracking
+   */
+  async addInventoryItem(characterId, itemData) {
+    const item = await this.persistenceManager.addInventoryItem(characterId, itemData);
+    
+    // Also record detailed memory event
+    await this.recordEvent('item_acquired', {
+      characterId,
+      itemName: item.item_name,
+      itemType: item.item_type,
+      description: item.description,
+      location: this.getCurrentLocation(),
+      method: 'found/given/purchased'
+    }, 0.5);
+
+    return item;
+  }
+
+  /**
+   * Remove item from inventory with memory tracking
+   */
+  async removeInventoryItem(characterId, itemName, quantity = 1, reason = 'used') {
+    const result = await this.persistenceManager.removeInventoryItem(characterId, itemName, quantity);
+    
+    // Record detailed memory event
+    await this.recordEvent('item_lost', {
+      characterId,
+      itemName,
+      quantity,
+      reason,
+      location: this.getCurrentLocation()
+    }, 0.6); // Higher significance for item loss
+
+    return result;
+  }
+
+  /**
+   * Get character inventory for GM context
+   */
+  getCharacterInventory(characterId) {
+    return this.persistenceManager.getCharacterInventory(characterId);
+  }
+
+  /**
+   * Create NPC with memory tracking
+   */
+  async createNPC(npcData) {
+    const npc = await this.persistenceManager.createNPC(npcData);
+    
+    await this.recordEvent('npc_introduction', {
+      npcName: npc.npc_name,
+      npcType: npc.npc_type,
+      location: npc.location,
+      disposition: npc.disposition,
+      description: npc.description
+    }, 0.7);
+
+    return npc;
+  }
+
+  /**
+   * Update NPC with memory tracking
+   */
+  async updateNPC(npcName, updates) {
+    const result = await this.persistenceManager.updateNPC(npcName, updates);
+    
+    // Record significant changes
+    if (updates.location) {
+      await this.recordEvent('npc_movement', {
+        npcName,
+        newLocation: updates.location,
+        previousLocation: updates.previousLocation || 'unknown'
+      }, 0.5);
+    }
+
+    if (updates.status && updates.status === 'dead') {
+      await this.recordEvent('npc_death', {
+        npcName,
+        location: updates.location || this.getCurrentLocation(),
+        cause: updates.cause || 'unknown'
+      }, 0.9); // Very significant event
+    }
+
+    return result;
+  }
+
+  /**
+   * Create building with memory tracking
+   */
+  async createBuilding(buildingData) {
+    const building = await this.persistenceManager.createBuilding(buildingData);
+    
+    await this.recordEvent('building_constructed', {
+      buildingName: building.building_name,
+      buildingType: building.building_type,
+      location: building.location,
+      size: building.size,
+      owner: building.owner
+    }, 0.8);
+
+    return building;
+  }
+
+  /**
+   * Create vehicle/ship with memory tracking
+   */
+  async createVehicle(vehicleData) {
+    const vehicle = await this.persistenceManager.createVehicle(vehicleData);
+    
+    await this.recordEvent('vehicle_acquired', {
+      vehicleName: vehicle.vehicle_name,
+      vehicleType: vehicle.vehicle_type,
+      location: vehicle.location,
+      size: vehicle.size
+    }, 0.8);
+
+    return vehicle;
+  }
+
+  /**
+   * Build enhanced memory context including all persistent entities
+   */
+  async buildEnhancedMemoryContext(currentScene, characters) {
+    // Get regular memory context
+    const memoryContext = await this.buildMemoryContext(currentScene, characters);
+    
+    // Get persistent entities in current location
+    const locationContext = this.persistenceManager.buildLocationContext(currentScene.location);
+    
+    // Build comprehensive context string
+    let enhancedContext = memoryContext + "\\n\\n";
+    
+    // Add current inventory for each character
+    enhancedContext += "## Current Inventory\\n";
+    for (const character of characters) {
+      const inventory = this.getCharacterInventory(character.id || character.name);
+      if (inventory.length > 0) {
+        enhancedContext += `**${character.name}:**\\n`;
+        inventory.forEach(item => {
+          const qty = item.quantity > 1 ? ` (${item.quantity}x)` : '';
+          enhancedContext += `- ${item.item_name}${qty}: ${item.description}\\n`;
+        });
+        enhancedContext += "\\n";
+      }
+    }
+
+    // Add NPCs in current location
+    if (locationContext.npcs.length > 0) {
+      enhancedContext += "## NPCs Present\\n";
+      locationContext.npcs.forEach(npc => {
+        enhancedContext += `- **${npc.npc_name}** (${npc.npc_type}): ${npc.disposition} disposition. ${npc.description}\\n`;
+      });
+      enhancedContext += "\\n";
+    }
+
+    // Add buildings in current location
+    if (locationContext.buildings.length > 0) {
+      enhancedContext += "## Buildings/Structures\\n";
+      locationContext.buildings.forEach(building => {
+        enhancedContext += `- **${building.building_name}** (${building.building_type}): ${building.description}\\n`;
+      });
+      enhancedContext += "\\n";
+    }
+
+    // Add vehicles in current location
+    if (locationContext.vehicles.length > 0) {
+      enhancedContext += "## Vehicles/Ships\\n";
+      locationContext.vehicles.forEach(vehicle => {
+        enhancedContext += `- **${vehicle.vehicle_name}** (${vehicle.vehicle_type}): ${vehicle.description}\\n`;
+      });
+      enhancedContext += "\\n";
+    }
+
+    return enhancedContext;
+  }
+
+  /**
+   * Search for any entity (NPC, building, vehicle, etc.)
+   */
+  findEntity(entityName) {
+    return this.persistenceManager.findEntity(entityName);
   }
 
   /**
