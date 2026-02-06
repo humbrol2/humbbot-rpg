@@ -1,0 +1,12 @@
+{
+  "1770342689829-spacb0b1t": {
+    "type": "session_start",
+    "significance": 0.8,
+    "timestamp": 1770342690005,
+    "world": "Memory Test World",
+    "setting": "fantasy",
+    "startTime": 1770342689829,
+    "text": "Event type session_start: {\"world\":\"Memory Test World\",\"setting\":\"fantasy\",\"startTime\":1770342689829}",
+    "access_count": 0
+  }
+}

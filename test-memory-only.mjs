@@ -171,13 +171,13 @@ async function testManualMemoryEvents() {
     };
 
     const relevantMemories = await memoryManager.getRelevantMemories(context, 1000);
-    console.log(`✓ Found ${relevantMemories.length} relevant memories for context`);
+    console.log(`✓ Found ${relevantMemories?.length || 0} relevant memories for context`);
 
     // Test vector search
     const searchResults = await memoryManager.searchMemories('dragon battle', 5);
-    console.log(`✓ Vector search found ${searchResults.length} results`);
+    console.log(`✓ Vector search found ${searchResults?.length || 0} results`);
 
-    if (searchResults.length > 0) {
+    if (searchResults && searchResults.length > 0) {
       const bestMatch = searchResults[0];
       console.log(`  → Best match: ${bestMatch.type} event (${(bestMatch.similarity * 100).toFixed(1)}% similarity)`);
     }
@@ -198,7 +198,7 @@ async function testManualMemoryEvents() {
     console.log(`  • Hybrid mode: ${stats.hybridMode}`);
     console.log(`  • Vector weight: ${stats.vectorWeight}`);
 
-    return { success: true, events: events.length, memories: relevantMemories.length };
+    return { success: true, events: events.length, memories: relevantMemories?.length || 0 };
 
   } catch (error) {
     console.error('❌ Manual memory test failed:', error.message);

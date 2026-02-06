@@ -1,0 +1,16 @@
+[
+  {
+    "id": "1770342689829-spacb0b1t",
+    "type": "session_start",
+    "timestamp": 1770342689829,
+    "data": {
+      "world": "Memory Test World",
+      "setting": "fantasy",
+      "startTime": 1770342689829
+    },
+    "significance": 0.8,
+    "tier": "HOT",
+    "accessCount": 0,
+    "lastAccessed": 1770342689829
+  }
+]

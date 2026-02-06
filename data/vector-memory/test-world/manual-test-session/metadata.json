@@ -42,5 +42,49 @@
     "method": "on foot",
     "text": "Party traveled from Tower to Dark Forest via on foot.",
     "access_count": 0
+  },
+  "1770342690202-kt25dvsmo": {
+    "type": "combat",
+    "significance": 0.9,
+    "timestamp": 1770342690254,
+    "participants": [
+      "Hero",
+      "Dragon"
+    ],
+    "outcome": "victory",
+    "location": "Dragon Lair",
+    "text": "Combat at Dragon Lair between Hero, Dragon. Outcome: victory.",
+    "access_count": 0
+  },
+  "1770342690257-pklkfxfil": {
+    "type": "dialogue",
+    "significance": 0.6,
+    "timestamp": 1770342690266,
+    "speaker": "Wizard",
+    "content": "The ancient prophecy speaks of a chosen one...",
+    "location": "Tower",
+    "text": "Wizard said: \"The ancient prophecy speaks of a chosen one...\" at Tower.",
+    "access_count": 0
+  },
+  "1770342690268-rmu7yn0ex": {
+    "type": "quest",
+    "significance": 0.8,
+    "timestamp": 1770342690275,
+    "questId": "Save the Kingdom",
+    "action": "accepted",
+    "newStatus": "active",
+    "location": "Throne Room",
+    "text": "Quest \"Save the Kingdom\" at Throne Room: accepted. Status changed to active.",
+    "access_count": 0
+  },
+  "1770342690279-cdkebv988": {
+    "type": "travel",
+    "significance": 0.3,
+    "timestamp": 1770342690286,
+    "from": "Tower",
+    "to": "Dark Forest",
+    "method": "on foot",
+    "text": "Party traveled from Tower to Dark Forest via on foot.",
+    "access_count": 0
   }
 }
