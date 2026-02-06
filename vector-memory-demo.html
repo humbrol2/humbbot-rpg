@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vector Memory Systems Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #4a5568;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #718096;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        
+        .demo-section {
+            margin-bottom: 40px;
+            padding: 25px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            background: #f7fafc;
+        }
+        
+        .demo-section h2 {
+            margin-top: 0;
+            color: #2d3748;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #48bb78;
+            box-shadow: 0 0 10px rgba(72, 187, 120, 0.3);
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #4a5568;
+        }
+        
+        input, textarea, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .results {
+            margin-top: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            min-height: 100px;
+        }
+        
+        .memory-item {
+            padding: 15px;
+            margin-bottom: 15px;
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            border-radius: 4px;
+        }
+        
+        .similarity-score {
+            background: #667eea;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            float: right;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .feature-card {
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            text-align: center;
+        }
+        
+        .feature-icon {
+            font-size: 32px;
+            margin-bottom: 15px;
+        }
+        
+        .api-status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: #f0fff4;
+            border: 1px solid #9ae6b4;
+            border-radius: 6px;
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 Vector Memory Systems Demo</h1>
+        <p class="subtitle">Semantic memory search and RPG character persistence powered by local embeddings</p>
+        
+        <div class="api-status">
+            <span>🔗 System Status: <strong>Vector Memory Operational</strong></span>
+            <div class="status-indicator"></div>
+        </div>
+        
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🔍</div>
+                <h3>Semantic Search</h3>
+                <p>Find related content through meaning, not just keywords</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🎮</div>
+                <h3>RPG Memory</h3>
+                <p>Characters remember actions and NPCs track relationships</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Real-time</h3>
+                <p>Instant semantic understanding using local embeddings</p>
+            </div>
+        </div>
+        
+        <div class="demo-section">
+            <h2>
+                <div class="status-indicator"></div>
+                Memory Search Demo
+            </h2>
+            
+            <div class="input-group">
+                <label for="search-query">Search Query</label>
+                <input type="text" id="search-query" placeholder="Try: 'context optimization', 'character actions', or 'technical implementation'" 
+                       value="hybrid context optimization system">
+            </div>
+            
+            <button onclick="searchMemory()">🔍 Search Semantic Memory</button>
+            
+            <div class="results" id="search-results">
+                <p style="text-align: center; color: #718096;">Enter a search query to find semantically related memories</p>
+            </div>
+        </div>
+        
+        <div class="demo-section">
+            <h2>
+                <div class="status-indicator"></div>
+                RPG Character Memory Demo
+            </h2>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div>
+                    <div class="input-group">
+                        <label for="character-name">Character Name</label>
+                        <input type="text" id="character-name" value="Kira_Shadowbane">
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="character-action">Action Performed</label>
+                        <input type="text" id="character-action" value="discovered hidden treasure chamber">
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="input-group">
+                        <label for="location">Location</label>
+                        <input type="text" id="location" value="ancient underground ruins">
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="world-type">World Type</label>
+                        <select id="world-type">
+                            <option value="fantasy">Fantasy</option>
+                            <option value="scifi">Sci-Fi</option>
+                            <option value="modern">Modern</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <button onclick="addCharacterAction()">⚔️ Add Character Action</button>
+            <button onclick="generateGMContext()">🧠 Generate GM Context</button>
+            
+            <div class="results" id="rpg-results">
+                <p style="text-align: center; color: #718096;">Add character actions or generate GM context to see RPG memory in action</p>
+            </div>
+        </div>
+        
+        <div class="demo-section">
+            <h2>
+                <div class="status-indicator"></div>
+                Add Memory Entry
+            </h2>
+            
+            <div class="input-group">
+                <label for="memory-content">Memory Content</label>
+                <textarea id="memory-content" rows="3" 
+                         placeholder="Enter a new memory to store (e.g., technical insight, character experience, world event)">Vector memory systems enable AI to understand semantic relationships between stored information, providing intelligent context retrieval for enhanced decision making.</textarea>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div class="input-group">
+                    <label for="memory-source">Source/Context</label>
+                    <input type="text" id="memory-source" value="demo_session_001">
+                </div>
+                
+                <div class="input-group">
+                    <label for="memory-type">Memory Type</label>
+                    <select id="memory-type">
+                        <option value="technical">Technical</option>
+                        <option value="character_action">Character Action</option>
+                        <option value="world_event">World Event</option>
+                        <option value="general">General</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button onclick="addMemory()">💾 Store Memory</button>
+            
+            <div class="results" id="add-memory-results">
+                <p style="text-align: center; color: #718096;">Memories are stored with semantic embeddings for intelligent retrieval</p>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 40px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+            <h3>🚀 System Architecture</h3>
+            <p><strong>Local Embedding Service:</strong> Nomic-Embed (Port 8082)</p>
+            <p><strong>Vector Storage:</strong> In-memory with cosine similarity</p>
+            <p><strong>Integration:</strong> Drop-in replacement for OpenClaw memory_search</p>
+            <p><strong>Fallback:</strong> File-based storage for reliability</p>
+        </div>
+    </div>
+
+    <script>
+        // Demo functionality (would connect to actual backend)
+        
+        async function searchMemory() {
+            const query = document.getElementById('search-query').value;
+            const resultsDiv = document.getElementById('search-results');
+            
+            resultsDiv.innerHTML = `<p style="text-align: center;">🔍 Searching for: "${query}"...</p>`;
+            
+            // Simulate API call delay
+            setTimeout(() => {
+                const mockResults = [
+                    {
+                        content: "Hybrid context optimization system provides 77% token reduction for large contexts while maintaining quality through content-specific compression prompts",
+                        source: "technical_implementation",
+                        similarity: 0.892
+                    },
+                    {
+                        content: "Context optimization is the foundation of persistent synchronization. For efficient memory management, buffer limits represent operational failures",
+                        source: "moltbook_discussion", 
+                        similarity: 0.756
+                    },
+                    {
+                        content: "Memory optimization using vector embeddings enables semantic understanding of stored information relationships",
+                        source: "vector_system_notes",
+                        similarity: 0.681
+                    }
+                ];
+                
+                let html = `<h4>Found ${mockResults.length} semantic matches:</h4>`;
+                
+                mockResults.forEach((result, i) => {
+                    html += `
+                        <div class="memory-item">
+                            <div class="similarity-score">${Math.round(result.similarity * 100)}% match</div>
+                            <strong>Source:</strong> ${result.source}<br>
+                            <strong>Content:</strong> ${result.content}
+                        </div>
+                    `;
+                });
+                
+                resultsDiv.innerHTML = html;
+            }, 1000);
+        }
+        
+        async function addCharacterAction() {
+            const character = document.getElementById('character-name').value;
+            const action = document.getElementById('character-action').value;
+            const location = document.getElementById('location').value;
+            const resultsDiv = document.getElementById('rpg-results');
+            
+            resultsDiv.innerHTML = `<p style="text-align: center;">⚔️ Adding action for ${character}...</p>`;
+            
+            setTimeout(() => {
+                resultsDiv.innerHTML = `
+                    <div class="memory-item">
+                        <strong>✅ Character Action Stored</strong><br>
+                        <strong>Character:</strong> ${character}<br>
+                        <strong>Action:</strong> ${action}<br>
+                        <strong>Location:</strong> ${location}<br>
+                        <strong>Memory ID:</strong> char_${Date.now()}<br>
+                        <em>This action is now part of ${character}'s persistent memory and will influence future NPC interactions and world state.</em>
+                    </div>
+                `;
+            }, 800);
+        }
+        
+        async function generateGMContext() {
+            const character = document.getElementById('character-name').value;
+            const location = document.getElementById('location').value;
+            const resultsDiv = document.getElementById('rpg-results');
+            
+            resultsDiv.innerHTML = `<p style="text-align: center;">🧠 Generating GM context for ${character}...</p>`;
+            
+            setTimeout(() => {
+                resultsDiv.innerHTML = `
+                    <div class="memory-item">
+                        <strong>🧠 GM Context Generated</strong><br><br>
+                        <strong>GM Context for ${character} in ${location}:</strong><br><br>
+                        <strong>Character Background:</strong><br>
+                        • Previously discovered hidden treasure chamber (confident, curious)<br>
+                        • Has experience with ancient ruins exploration<br>
+                        • Showed careful approach to unknown magical artifacts<br><br>
+                        <strong>Location History:</strong><br>
+                        • Ancient underground ruins have yielded significant discoveries<br>
+                        • Recent magical activity detected in deeper chambers<br>
+                        • Current state: mysterious but rewarding<br><br>
+                        <strong>World Knowledge:</strong><br>
+                        • Ancient ruins often contain both treasures and dangerous guardians<br>
+                        • Magic requires study and practice to use safely<br><br>
+                        <em>This context enables the GM to provide responses that acknowledge ${character}'s history and the established world state.</em>
+                    </div>
+                `;
+            }, 1200);
+        }
+        
+        async function addMemory() {
+            const content = document.getElementById('memory-content').value;
+            const source = document.getElementById('memory-source').value;
+            const type = document.getElementById('memory-type').value;
+            const resultsDiv = document.getElementById('add-memory-results');
+            
+            resultsDiv.innerHTML = `<p style="text-align: center;">💾 Generating embeddings and storing memory...</p>`;
+            
+            setTimeout(() => {
+                resultsDiv.innerHTML = `
+                    <div class="memory-item">
+                        <strong>✅ Memory Stored Successfully</strong><br>
+                        <strong>Content:</strong> ${content.substring(0, 100)}${content.length > 100 ? '...' : ''}<br>
+                        <strong>Source:</strong> ${source}<br>
+                        <strong>Type:</strong> ${type}<br>
+                        <strong>Vector ID:</strong> vec_${Date.now()}<br>
+                        <strong>Embedding Dimensions:</strong> 768<br>
+                        <em>Memory is now searchable through semantic similarity and will appear in relevant context generation.</em>
+                    </div>
+                `;
+            }, 1000);
+        }
+        
+        // Auto-search on page load
+        window.onload = function() {
+            setTimeout(searchMemory, 500);
+        };
+    </script>
+</body>
+</html>
